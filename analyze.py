@@ -195,9 +195,11 @@ def case5(myarch):
 
 # introspect_object(myarch)
 
+
+owner_tree = myarch.get_owner_tree(myarch.component1.subcomp.activity1)
+print("owner_tree of ", myarch.component1.subcomp.activity1.name, " is ", owner_tree)
+
 case3(myarch)
-print("simulate arch:")
-case5(myarch)
 # myarch.simulate()
 
 # myarch.add(PlantumlComponent("Added to the clone"))
@@ -210,7 +212,9 @@ case5(myarch)
 # print("simulate 2:")
 #myarch.simulate()
 
-# case4(myarch)
+case4(myarch)
 
 
 
+print("simulate arch:")
+case5(myarch)

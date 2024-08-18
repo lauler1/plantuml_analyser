@@ -45,7 +45,7 @@ class PlantumlType:
         print(f"Adding {value.name}")
 
         # Sanitize the variable name: replace invalid characters with '_'
-        sanitized_name = re.sub(r'\W|^(?=\d)', '_', value.name.lower())
+        sanitized_name = sanitize_name(value.name)#re.sub(r'\W|^(?=\d)', '_', value.name.lower())
         
         # Set the attribute on the class instance using reflection
         setattr(self, sanitized_name, value)
@@ -65,7 +65,7 @@ class PlantumlType:
                 return True
         return False
         
-    def get_owner(self, activity):
+    def get_activity_owner(self, activity):
         result = None
         for key, value in vars(self.__class__).items():
             if isinstance(value, PlantumlActivity) and activity == value:
@@ -73,7 +73,7 @@ class PlantumlType:
                 # print(f"   Found owner of {activity.name}, it is {result}, {key}")
                 return result
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
-                result = value.get_owner(activity)
+                result = value.get_activity_owner(activity)
                 if result != None and  isinstance(value, PlantumlType):
                     return result
         for key, value in self.__dict__.items():
@@ -82,10 +82,49 @@ class PlantumlType:
                 # print(f"   Found owner of {activity.name}, it is {result}, {key}")
                 return result
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
-                result = value.get_owner(activity)
+                result = value.get_activity_owner(activity)
                 if result != None and  isinstance(value, PlantumlType):
                     return result
         return result
+
+    def get_owner(self, object):
+
+        # print(f"   self: {self}")
+        result = None
+        for key, value in vars(self.__class__).items():
+            # print(f"   Class: {key}:{value}")
+            if object == value:
+                result = self
+                # print(f"   Found owner of {object.name}, it is {result}, {key}")
+                return result
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.get_owner(object)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        for key, value in self.__dict__.items():
+            # print(f"   Object: {key}:{value}")
+            if object == value:
+                result = self
+                # print(f"   Found owner of {object.name}, it is {result}, {key}")
+                return result
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.get_owner(object)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        return result
+        
+    def get_owner_tree(self, object):
+        owner_tree = []
+        current_owner = self.get_owner(object)
+        
+        # print("   self =", self.name)
+
+        while current_owner is not None:
+            # print("     current_owner =", current_owner.name)
+            owner_tree.append(current_owner.name)
+            current_owner = self.get_owner(current_owner)
+
+        return owner_tree
 
     def set_options(self, **options):
         """
@@ -240,7 +279,7 @@ skinparam component {
         participants = {}
         for activity in activities:
             # print(f"  gather_participants {activity.name}")
-            res = self.get_owner(activity)
+            res = self.get_activity_owner(activity)
             # print(f"    gather_participants res={res}")
             owners.add(res)
         # print("  Owners:", owners)
@@ -251,7 +290,7 @@ skinparam component {
                 if isinstance(owner, PlantumlActor):
                     color = "#C6E6FF"
                 # print("  Owner:", owner.name)
-                sanitized_name = re.sub(r'\W|^(?=\d)', '_', owner.name.lower())
+                sanitized_name = sanitize_name(owner.name)#re.sub(r'\W|^(?=\d)', '_', owner.name.lower())
                 # print(f'participant "{owner}" as {sanitized_name}')
                 participants[sanitized_name] = f'participant "{owner.name}" as {sanitized_name} {color}'
         self.metadata_dict['participants'] = participants
@@ -261,18 +300,18 @@ skinparam component {
 
     def set_simulation_activate(self, component):
         if isinstance(component, PlantumlActivity):
-            component = self.get_owner(component)
+            component = self.get_activity_owner(component)
         self.metadata_dict['sequence'].append(f"activate {sanitize_name(component.name)}")
 
     def set_simulation_deactivate(self, component):
         if isinstance(component, PlantumlActivity):
-            component = self.get_owner(component)
+            component = self.get_activity_owner(component)
         self.metadata_dict['sequence'].append(f"deactivate {sanitize_name(component.name)}")
 
     def set_simulation_activity_decorator(self, component):
         if not isinstance(component, PlantumlActivity):
             return
-        owner = self.get_owner(component)
+        owner = self.get_activity_owner(component)
         self.metadata_dict['sequence'].append(f"rnote over {sanitize_name(owner.name)} #C5FFA6\n{component.name}\nendrnote")
 
 
@@ -366,20 +405,21 @@ class PlantumlConnection(PlantumlType):
     def print_transmission(self, architecture, sender, text):
         send_name = sender.name 
         if isinstance(sender, PlantumlActivity):
-            send_name = architecture.get_owner(sender).name
+            send_name = architecture.get_activity_owner(sender).name
 
         other = self.comp1
         if other == sender:
             other = self.comp2
         other_name = other.name 
         if isinstance(sender, PlantumlActivity):
-            other_name = architecture.get_owner(other).name
-            
-        architecture.metadata_dict['part_seq'].append(re.sub(r'\W|^(?=\d)', '_', send_name.lower()))
-        architecture.metadata_dict['part_seq'].append(re.sub(r'\W|^(?=\d)', '_', other_name.lower()))
+            other_name = architecture.get_activity_owner(other).name
+        sanitized_send_name = sanitize_name(send_name)
+        sanitized_other_name = sanitize_name(other_name)
+        architecture.metadata_dict['part_seq'].append(sanitized_send_name)#re.sub(r'\W|^(?=\d)', '_', send_name.lower()))
+        architecture.metadata_dict['part_seq'].append(sanitized_other_name)#re.sub(r'\W|^(?=\d)', '_', other_name.lower()))
 
         # print(f"{re.sub(r'\W|^(?=\d)', '_', send_name.lower())} -> {re.sub(r'\W|^(?=\d)', '_', other_name.lower())}")
-        architecture.metadata_dict['sequence'].append(f"{re.sub(r'\W|^(?=\d)', '_', send_name.lower())} -> {re.sub(r'\W|^(?=\d)', '_', other_name.lower())}: {text}")
+        architecture.metadata_dict['sequence'].append(f"{sanitized_send_name} -> {sanitized_other_name}: {text}")
         
     async def send_message(self, architecture, sender, lable, data=""):
         """

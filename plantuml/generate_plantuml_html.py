@@ -4,6 +4,15 @@ import jinja2
 import functools
 from plantuml.plantuml_compress import deflate_and_encode
 
+def escape_html(text: str) -> str:
+    # Replace special characters with their corresponding HTML entities
+    text = text.replace("&", "&amp;")  # Replace '&' first to avoid double replacement
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+    text = text.replace('"', "&quot;")
+    text = text.replace("'", "&#39;")
+    return text
+    
 def redirect_output_to_html(file_name, title):
     def decorator(func):
         """Decorator to capture stdout output of a function."""
@@ -105,7 +114,7 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
         <script>
             Prism.languages.plantuml = {
                 'keyword': /@(?:startuml|enduml)/,
-                'arrow': /(?:->|<-|--|~|\.|-|>|<#\w+>)/,
+                'arrow': /(?:->|<-|--|~|\.|-|>|<|<#\w+>)/,
                 'directive': /\b(?:skinparam|note|agent|interface|component|actor|as)\b/,
                 'string': /".*?"/,
                 'comment': /'.*$/m,
@@ -118,7 +127,7 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
     """
 
     template = jinja2.Template(template_str)
-    html_output = template.render(img_url=img_url, plantuml_script=plantuml_script, title=title)
+    html_output = template.render(img_url=img_url, plantuml_script=escape_html(plantuml_script), title=title)
 
     #output_path = "output.html"
     with open(output_path, "w") as f:

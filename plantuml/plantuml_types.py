@@ -2,13 +2,21 @@ from copy import deepcopy
 import re
 import types
 import asyncio
-from dataclasses import dataclass, field
+
+import inspect
 
 def get_variable_names(obj, namespace):
     return [name for name in namespace if namespace[name] is obj]
 
 def sanitize_name(name):
     return re.sub(r'\W|^(?=\d)', '_', name.lower())
+
+class ObjectRef:
+    """
+    Stores a simple obj reference, it is used to store PlantumlType avoiding recursive searches.
+    """
+    def __init__(self, ref):
+        self.ref = ref
 
 class PlantumlType:
     """
@@ -33,7 +41,7 @@ class PlantumlType:
         """
         self.name = name
         self.type = "Type"
-        self.path = name
+        # self.path = name
         self.metadata_dict = {"hide": False, "remove": False}
         # print("---->", get_variable_names(self, globals()))
 
@@ -42,10 +50,17 @@ class PlantumlType:
         self.instance_count = PlantumlType._instance_count
 
     def add(self, value):
-        print(f"Adding {value.name}")
-
-        # Sanitize the variable name: replace invalid characters with '_'
-        sanitized_name = sanitize_name(value.name)#re.sub(r'\W|^(?=\d)', '_', value.name.lower())
+        """
+        Add a new attribute to the class. The attribute must be instance of PlantumlType or ObjectRef of an instance of PlantumlType.
+        """
+        if isinstance(value, ObjectRef):
+            print(f"Adding {value.ref.name}")
+            sanitized_name = sanitize_name(value.ref.name)
+        elif isinstance(value, PlantumlType):
+            print(f"Adding {value.name}")
+            sanitized_name = sanitize_name(value.name)
+        else:
+            return
         
         # Set the attribute on the class instance using reflection
         setattr(self, sanitized_name, value)
@@ -58,7 +73,6 @@ class PlantumlType:
             # Check if any attribute is an instance of the specified base class
             if isinstance(attr_value, PlantumlType):
                 return True
-
         # Check static (class) variables
         for attr_name, attr_value in vars(self.__class__).items():
             if isinstance(attr_value, PlantumlType):
@@ -88,24 +102,18 @@ class PlantumlType:
         return result
 
     def get_owner(self, object):
-
-        # print(f"   self: {self}")
         result = None
         for key, value in vars(self.__class__).items():
-            # print(f"   Class: {key}:{value}")
             if object == value:
                 result = self
-                # print(f"   Found owner of {object.name}, it is {result}, {key}")
                 return result
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
                 result = value.get_owner(object)
                 if result != None and isinstance(value, PlantumlType):
                     return result
         for key, value in self.__dict__.items():
-            # print(f"   Object: {key}:{value}")
             if object == value:
                 result = self
-                # print(f"   Found owner of {object.name}, it is {result}, {key}")
                 return result
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
                 result = value.get_owner(object)
@@ -113,28 +121,26 @@ class PlantumlType:
                     return result
         return result
         
-    def get_owner_tree(self, object):
-        owner_tree = []
-        current_owner = self.get_owner(object)
-        
-        # print("   self =", self.name)
-
-        while current_owner is not None:
-            # print("     current_owner =", current_owner.name)
-            owner_tree.append(current_owner.name)
-            current_owner = self.get_owner(current_owner)
-
-        return owner_tree
-
-    def set_options(self, **options):
-        """
-        Update the options, refer to the main constructor for more details.
-        """
-        # Update the metadata_dict with the provided options
-        self.metadata_dict.update(options)
-
-    def replace_call_method(new_call_method):
-        self.__call__ = types.MethodType(new_call_method, self)
+    def find_sub_obj_by_name_recursive(self, name):
+        result = None
+        for key, value in self.__dict__.items():
+            if isinstance(value, PlantumlType) and value.name == name:
+                print (f"  Found obj '{name}' at instance level")
+                return value
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.find_sub_obj_by_name_recursive(name)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        for key, value in vars(self.__class__).items():
+            if isinstance(value, PlantumlType) and value.name == name:
+                print (f"  Found obj '{name}' at class level")
+                return value
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.find_sub_obj_by_name_recursive(name)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        # print (f"Obj '{name}' not found")
+        return None
 
     def get_sub_obj_by_name(self, name):
         for key, value in self.__dict__.items():
@@ -147,6 +153,32 @@ class PlantumlType:
                 return value
         print (f"Obj '{name}' not found")
         return None
+
+    def get_owner_tree(self, object):
+        owner_tree = []
+        current_owner = self.get_owner(object)
+
+        while current_owner is not None:
+            owner_tree.insert(0, current_owner)
+            current_owner = self.get_owner(current_owner)
+
+        return owner_tree
+
+    def get_complete_path_name(self, object):
+        owner_tree = self.get_owner_tree(object)
+        name_tree = [sanitize_name(item.name) for item in owner_tree]
+        name_tree.append(sanitize_name(object.name))
+        return "_".join(name_tree)
+
+    def set_options(self, **options):
+        """
+        Update the options, refer to the main constructor for more details.
+        """
+        # Update the metadata_dict with the provided options
+        self.metadata_dict.update(options)
+
+    def replace_call_method(new_call_method):
+        self.__call__ = types.MethodType(new_call_method, self)
 
     def get_all_activities(self, level = 1):
         activities_list = set()
@@ -225,9 +257,8 @@ class PlantumlActivity(PlantumlType):
         The default __call__ for an activity does not do any particular action, you shall replace it by another call (you can use replace_call_method);
         Note, it must be async.
         """
-    
         # print(f"Starting async call for {self.name}...")
-        await asyncio.sleep(2)  # Simulating an asynchronous operation
+        await asyncio.sleep(0)  # Simulating an asynchronous operation
         # print(f"Async call completed for {self.name}!")    
 
 class PlantumlArchitecture(PlantumlType):
@@ -272,94 +303,6 @@ skinparam component {
   ArrowFontColor #4D4D4D
 }
 """
-        super().__post_init__()
-
-    def gather_participants(self, activities):
-        owners = set()
-        participants = {}
-        for activity in activities:
-            # print(f"  gather_participants {activity.name}")
-            res = self.get_activity_owner(activity)
-            # print(f"    gather_participants res={res}")
-            owners.add(res)
-        # print("  Owners:", owners)
-        for owner in owners:
-            if owner != None:
-                color = "#96B1DA"
-                
-                if isinstance(owner, PlantumlActor):
-                    color = "#C6E6FF"
-                # print("  Owner:", owner.name)
-                sanitized_name = sanitize_name(owner.name)#re.sub(r'\W|^(?=\d)', '_', owner.name.lower())
-                # print(f'participant "{owner}" as {sanitized_name}')
-                participants[sanitized_name] = f'participant "{owner.name}" as {sanitized_name} {color}'
-        self.metadata_dict['participants'] = participants
-
-    def set_simulation_decorator(self, deco_text):
-        self.metadata_dict['sequence'].append(deco_text)
-
-    def set_simulation_activate(self, component):
-        if isinstance(component, PlantumlActivity):
-            component = self.get_activity_owner(component)
-        self.metadata_dict['sequence'].append(f"activate {sanitize_name(component.name)}")
-
-    def set_simulation_deactivate(self, component):
-        if isinstance(component, PlantumlActivity):
-            component = self.get_activity_owner(component)
-        self.metadata_dict['sequence'].append(f"deactivate {sanitize_name(component.name)}")
-
-    def set_simulation_activity_decorator(self, component):
-        if not isinstance(component, PlantumlActivity):
-            return
-        owner = self.get_activity_owner(component)
-        self.metadata_dict['sequence'].append(f"rnote over {sanitize_name(owner.name)} #C5FFA6\n{component.name}\nendrnote")
-
-
-    async def run(self, activities):
-        # Run the list of coroutines concurrently
-        # print ("Running coroutines:", activities)
-        await asyncio.gather(*(coro.run(self) for coro in activities))
-
-    def simulate(self):
-        activities = self.get_all_activities()
-        self.metadata_dict['part_seq'] = []
-        self.metadata_dict['sequence'] = []
-        
-        # for item in activities:
-            # print("       Activities: =", item)
-        print("@startuml")
-        
-        skinparam = """hide footbox
-skinparam roundcorner 0
-skinparam sequence {
-LifeLineBackgroundColor #C5FFA6
-LifeLineBorderColor #095C2E
-ParticipantFontColor #4A4A97
-ParticipantBorderColor #4A4A97
-ParticipantBackgroundColor #96B1DA
-}"""
-
-        print(skinparam)
-        # if "skinparam" in self.metadata_dict:
-            # print(self.metadata_dict["skinparam"])
-
-        self.gather_participants(activities)
-        asyncio.run(self.run(list(activities)))
-        
-        new_list_of_participants = []
-        for item in self.metadata_dict['part_seq']:
-            if not item in new_list_of_participants:
-                new_list_of_participants.append(item)
-        
-        for item in new_list_of_participants:
-            print(self.metadata_dict['participants'][item])
-        
-        
-        for item in self.metadata_dict['sequence'] :
-            print(item)
-        
-        print("@enduml")            
-
 
 class PlantumlConnection(PlantumlType):
     """
@@ -374,15 +317,17 @@ class PlantumlConnection(PlantumlType):
         options:
             direction: Can be "in", "out" or "inout". Default = "inout".
             line: plantuml connection line/arrow, e.g. "--", "->", "<-",... Default line used is "--"
-        
         """
         super().__init__(name)
         self.type = "ArchView"
-        self.comp1 = comp1
-        self.comp2 = comp2
         
         self.metadata_dict["direction"] = "inout"
+
+        self.metadata_dict.update(options)
         
+        self.set_refs(comp1, comp2)
+
+    def set_refs(self, comp1, comp2):
         assert isinstance(comp1, PlantumlActivity) or isinstance(comp1, PlantumlActor) or isinstance(comp1, PlantumlComponent), "comp1 must be of type PlantumlActivity, PlantumlActor or PlantumlComponent"
         
         if isinstance(comp1, PlantumlActivity):
@@ -391,56 +336,120 @@ class PlantumlConnection(PlantumlType):
         if not isinstance(comp1, PlantumlActivity):
             assert not isinstance(comp2, PlantumlActivity), "PlantumlActivity can only be connected to other PlantumlActivity"
 
-        self.metadata_dict.update(options)
-        self.queue = asyncio.Queue()
-        
-    # def __post_init__(self):       
-        # super().__post_init__()
+        self.comp1 = ObjectRef(comp1)
+        self.comp2 = ObjectRef(comp2)
 
         # Also creates the connection inside the componets
-        self.comp1.add(self)
-        self.comp2.add(self)
+        self.comp1.ref.add(ObjectRef(self))
+        self.comp2.ref.add(ObjectRef(self))
 
-        
-    def print_transmission(self, architecture, sender, text):
-        send_name = sender.name 
-        if isinstance(sender, PlantumlActivity):
-            send_name = architecture.get_activity_owner(sender).name
+def print_with_indent(text, indent=1):
+    print('    ' * indent + text)
 
-        other = self.comp1
-        if other == sender:
-            other = self.comp2
-        other_name = other.name 
-        if isinstance(sender, PlantumlActivity):
-            other_name = architecture.get_activity_owner(other).name
-        sanitized_send_name = sanitize_name(send_name)
-        sanitized_other_name = sanitize_name(other_name)
-        architecture.metadata_dict['part_seq'].append(sanitized_send_name)#re.sub(r'\W|^(?=\d)', '_', send_name.lower()))
-        architecture.metadata_dict['part_seq'].append(sanitized_other_name)#re.sub(r'\W|^(?=\d)', '_', other_name.lower()))
+def clone_plant_uml_object(object):
+    # for key, value in object.__dict__.items():
+        # if isinstance(value, PlantumlType):
+            # setattr(new_instance, key, clone_plant_uml_object(value))
+        # else:
+            # setattr(new_instance, key, deepcopy(value))
+            
+    return deepcopy(object)
+    
+    
+def go_through_connections(object, architecture):
+    for key, value in vars(object.__class__).items():
+        if isinstance(value, PlantumlConnection):
+            owner = architecture.get_owner(value)
+            owner_name = ""
+            if isinstance(owner, PlantumlType):
+                owner_name = owner.name
+            # print(f"  Class connection: {key}, owner={owner_name}, comp1={value.comp1.ref.name}, comp2={value.comp2.ref.name}")
+            # print(f"      insta={value}")
+            # print(f"      owner={owner}")
+            # print(f"      comp1={value.comp1.ref}")
+            # print(f"      comp2={value.comp2.ref}")
+            
+            comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
+            comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+            # print(f"       New comp1={comp1}")
+            # print(f"       New comp2={comp2}")
+            value.set_refs(comp1, comp2)
+            
+        elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+            result = value.get_owner(object)
+            go_through_connections(value, architecture)
+    for key, value in object.__dict__.items():
+        if isinstance(value, PlantumlConnection):
+            owner = architecture.get_owner(value)
+            owner_name = ""
+            if isinstance(owner, PlantumlType):
+                owner_name = owner.name
+            # print(f"  Objct connection: {key}, owner={owner_name}, comp1={value.comp1.ref.name}, comp2={value.comp2.ref.name}")
+            # print(f"      insta={value}")
+            # print(f"      owner={owner}")
+            # print(f"      comp1={value.comp1.ref}")
+            # print(f"      comp2={value.comp2.ref}")
+            
+            comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
+            comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+            # print(f"       New comp1={comp1}")
+            # print(f"       New comp2={comp2}")
+            value.set_refs(comp1, comp2)
+            
+        elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+            go_through_connections(value, architecture)
 
-        # print(f"{re.sub(r'\W|^(?=\d)', '_', send_name.lower())} -> {re.sub(r'\W|^(?=\d)', '_', other_name.lower())}")
-        architecture.metadata_dict['sequence'].append(f"{sanitized_send_name} -> {sanitized_other_name}: {text}")
-        
-    async def send_message(self, architecture, sender, lable, data=""):
-        """
-        Sends a message in the queue.
-        This method also yields the control to the event loop after sending.
-        """
-        self.print_transmission(architecture, sender, lable)
-        await self.queue.put({"label":lable, "data":data})
+    
+def clone_architecture(architecture, new_name, base_class=PlantumlArchitecture):
 
-    async def send_message_and_wait(self, architecture, sender, lable, data=""):
-        """
-        Sends a message and waits for an answer in the queue.
-        """
-        self.print_transmission(architecture, sender, lable)
-        self.queue.put_nowait({"label":lable, "data":data})
-        item = await self.queue.get()
-        return item
+    print("\n----------------------------------------------------------------------------------\nclone_architecture")
+    # print("original class items")
+    # for key, value in vars(architecture.__class__).items():
+        # print_with_indent(f"{key}: {value}")
+    # print("original object items")
+    # for key, value in architecture.__dict__.items():
+        # print_with_indent(f"{key}: {value}")
+    
+    # # Step 1: Get the original class and create a new class with the specified base class
+    OriginalClass = architecture.__class__
 
-    async def wait_message(self, architecture):
-        """
-        Waits for a message in the queue.
-        """
-        item = await self.queue.get()
-        return item
+    # # Create a new class dynamically that inherits from the given base class
+    NewClass = types.new_class(OriginalClass.__name__, (base_class,), {})
+
+    # Step 2: Copy the class attributes and methods from the original class
+    for key, value in OriginalClass.__dict__.items():
+        if not key.startswith('__'):
+            # Ensure that functions are correctly bound to the new class
+            if isinstance(value, types.FunctionType):
+                value = types.FunctionType(
+                    value.__code__,
+                    value.__globals__,
+                    name=value.__name__,
+                    argdefs=value.__defaults__,
+                    closure=value.__closure__
+                )
+                setattr(NewClass, key, value)
+            # elif isinstance(value, PlantumlType):
+                # setattr(NewClass, key, clone_plant_uml_object(value))
+            else:
+                setattr(NewClass, key, deepcopy(value))
+
+    # Step 3: Create a new instance of this new class
+    new_instance = NewClass(new_name)
+
+    # Step 4: Copy the instance attributes from the original instance
+    for key, value in architecture.__dict__.items():
+        setattr(new_instance, key, deepcopy(value))
+
+    # print("new class items")
+    # for key, value in vars(new_instance.__class__).items():
+        # print_with_indent(f"{key}: {value}")
+    # print("new object items")
+    # for key, value in new_instance.__dict__.items():
+        # print_with_indent(f"{key}: {value}")
+
+    # print("go_through_connections Original")
+    # go_through_connections(new_instance, architecture)
+    # print("go_through_connections new")
+    go_through_connections(new_instance, new_instance)
+    return new_instance

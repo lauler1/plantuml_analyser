@@ -16,8 +16,8 @@ def print_call_stack():
     for frame in stack:
         print(f"File '{frame.filename}', line {frame.lineno}, in {frame.function}")
 
-def print_plant_component(name, plantuml_obj, indent=0):
-    path = plantuml_obj.path
+def print_plant_component(name, plantuml_obj, architecture, indent=0):
+    path = architecture.get_complete_path_name(plantuml_obj) # plantuml_obj.path
     # print ("metadata_dict", plantuml_obj.metadata_dict, indent)
     color = ""
     if "color" in plantuml_obj.metadata_dict:
@@ -42,7 +42,7 @@ def print_plant_component(name, plantuml_obj, indent=0):
         print_with_indent(f"agent \"{name}\" as {path} ${path} {color}", indent)
 
 
-def create_plant_comonnection(name, plantuml_obj, indent=0):
+def create_plant_comonnection(name, plantuml_obj, architecture, indent=0):
     # path = plantuml_obj.path
     # print ("metadata_dict", plantuml_obj.metadata_dict, indent)
     # print_call_stack()
@@ -59,8 +59,8 @@ def create_plant_comonnection(name, plantuml_obj, indent=0):
         line = "<-"
 
     elif isinstance(plantuml_obj, pt.PlantumlConnection):
-        path1 = plantuml_obj.comp1.path
-        path2 = plantuml_obj.comp2.path
+        path1 = architecture.get_complete_path_name(plantuml_obj.comp1.ref) # plantuml_obj.comp1.ref.path
+        path2 = architecture.get_complete_path_name(plantuml_obj.comp2.ref) # plantuml_obj.comp2.ref.path
         return {name:f"{path1} {line} {path2} {color} : {name}"}
         # print_with_indent(f"{path1} {line} {path2} {color} : {name}", indent)
 
@@ -116,7 +116,7 @@ def introspect_object(obj, depth=1):
         for name, value in inspect.getmembers(obj):
             if not inspect.isroutine(value) and not name.startswith('__'):
                 print_with_indent(f"{name}: {value}", indent)
-                if is_container(value):
+                if is_container(value) and not isinstance(value, pt.PlantumlConnection):
                     introspect(value, indent+1)
 
     print_with_indent(f"Object of type: {type(obj).__name__}", depth)
@@ -137,39 +137,41 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
         kwargs -- Optional key/value arguments.
     """
 
-    def introspect(obj, path, connections, indent):
-        # print("path = ", path)
+    def introspect(obj, connections, plantuml_arch, indent):
+        path = ""
         for name, value in inspect.getmembers(obj):
             if not inspect.isroutine(value) and not name.startswith('__'):
                 if isinstance(value, pt.PlantumlType):
                     if value.name == "":
                         value.name = name
-                    value.path = join_path(path, name)
+                    path = plantuml_arch.get_complete_path_name(value)
+                    # value.path = join_path(path, name)
                     if isinstance(value, pt.PlantumlConnection):
                         if value.metadata_dict['hide'] == False and value.metadata_dict['remove'] == False:
-                            connections.update(create_plant_comonnection(value.name, value, indent))
+                            connections.update(create_plant_comonnection(value.name, value, plantuml_arch, indent))
                     else:
-                        print_plant_component(value.name, value, indent)
+                        print_plant_component(value.name, value, plantuml_arch, indent)
                     
 
                 if not isinstance(value, pt.PlantumlConnection) and is_container(value):
-                    introspect(value, join_path(path, name), connections, indent+1)
+                    introspect(value, connections, plantuml_arch, indent+1)
                 if isinstance(value, pt.PlantumlComponent) or isinstance(value, pt.PlantumlActor):
                     if value.has_sub_objs():
                         print_with_indent("}", indent)
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection) and value.metadata_dict['hide'] == True:
-                    print_with_indent(f"hide ${value.path}", indent)
+                    print_with_indent(f"hide ${path}", indent)
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection) and value.metadata_dict['remove'] == True:
-                    print_with_indent(f"remove ${value.path}", indent)
+                    print_with_indent(f"remove ${path}", indent)
                 if isinstance(value, pt.PlantumlType) and "note" in value.metadata_dict:
-                    note_path = value.path+"_note"
+                    
+                    note_path = path+"_note"
                     print_with_indent(f"note \"{value.metadata_dict['note']}\" as {note_path}", indent)
-                    print_with_indent(f"{note_path} ~ {value.path}", indent)
+                    print_with_indent(f"{note_path} ~ {path}", indent)
     connections = {}
     print("@startuml")
     if "skinparam" in plantuml_arch.metadata_dict:
         print(plantuml_arch.metadata_dict["skinparam"])
-    introspect(plantuml_arch, "", connections, 0)
+    introspect(plantuml_arch, connections, plantuml_arch, 0)
     
     for value in connections.values():
         print(value)

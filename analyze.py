@@ -7,7 +7,8 @@ from plantuml.plantuml_sequence import do_plantuml_sequence
 from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_object
 from plantuml.redirect_output_to_file import redirect_output_to_file
 from plantuml.generate_plantuml_html import redirect_output_to_html
-from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection
+from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture
+from plantuml.plantuml_simulation import PlantumlSimulation
 
 # Exemplo 1 -------------------------------------------------------------------
 def example_function(x, a=1, *args, **kwargs):
@@ -104,21 +105,21 @@ class MyComponent1(PlantumlComponent):
     class MyActivity1(PlantumlActivity):
         def __init__(self, name, **options):
             super().__init__(name, **options)
-        async def run(self, arch_inst):
-            # conn = arch_inst.get_sub_obj_by_name("Conn 1")
+        async def run(self, simulation):
+            # conn = simulation.get_sub_obj_by_name("Conn 1")
             # print(f"New run: Starting async call for {self.name}...")
-            arch_inst.set_simulation_activity_decorator(self)
-            result = await self.conn_1.wait_message(arch_inst)
+            simulation.set_simulation_activity_decorator(self)
+            result = await simulation.wait_message(self.conn_1)
             
-            arch_inst.set_simulation_decorator("alt #F2F2F2 sucess")
-            await self.conn_1.send_message(arch_inst, self, "message 2")
-            arch_inst.set_simulation_activate(self)
-            arch_inst.set_simulation_decorator("else error")
-            await self.conn_1.send_message(arch_inst, self, "message 3")
-            arch_inst.set_simulation_decorator("end")
+            simulation.set_simulation_decorator("alt #F2F2F2 sucess")
+            await simulation.send_message(self.conn_1, self, "message 2")
+            simulation.set_simulation_activate(self)
+            simulation.set_simulation_decorator("else error")
+            await simulation.send_message(self.conn_1, self, "message 3")
+            simulation.set_simulation_decorator("end")
             # print(f"New run: Async call completed for {self.name}!, result message = {result}")   
-            arch_inst.set_simulation_deactivate(self)
-            await self.conn_2.send_message(arch_inst, self, "message 4")
+            simulation.set_simulation_deactivate(self)
+            await simulation.send_message(self.conn_2, self, "message 4")
             
     activity1 = MyActivity1("Myactivity 1")
     activity2 = MyActivity("Myactivity 2")# , hide=True)
@@ -136,11 +137,11 @@ class MyActor(PlantumlActor):
     class MyActorActivity(PlantumlActivity):
         def __init__(self, name, **options):
             super().__init__(name, **options)
-        async def run(self, arch_inst):
-            #conn = arch_inst.get_sub_obj_by_name("Conn 1")
+        async def run(self, simulation):
+            #conn = simulation.get_sub_obj_by_name("Conn 1")
             # print(f"New run: Starting async call for {self.name}...")
-            arch_inst.set_simulation_activity_decorator(self)
-            await self.conn_1.send_message(arch_inst, self, "message 1")
+            simulation.set_simulation_activity_decorator(self)
+            await simulation.send_message(self.conn_1, self, "message 1")
             # print(f"New run: Async call completed for {self.name}!")   
 
     actor_activity = MyActorActivity("Actor activity")
@@ -188,33 +189,55 @@ def case4(myarch):
     # Example with do_plantuml_architecture
     do_plantuml_architecture(myarch)
 
-@redirect_output_to_html('output/mysimul.html', "Architecture Simulation test")
-def case5(myarch):
+@redirect_output_to_html('output/mysimul.html', "Architecture Simulation test", "First simulation attempt")
+def case5(mysim):
     # Example with PlantumlArchitecture simulate
-    myarch.simulate()
+    mysim.simulate()
+
+@redirect_output_to_html('output/mysimul2.html', "Architecture Simulation test 2", "Second simulation, to test repetition")
+def case6(mysim):
+    # Example with PlantumlArchitecture simulate
+    mysim.simulate()
 
 # introspect_object(myarch)
 
 
 owner_tree = myarch.get_owner_tree(myarch.component1.subcomp.activity1)
 print("owner_tree of ", myarch.component1.subcomp.activity1.name, " is ", owner_tree)
+print ("owner_path is ", myarch.get_complete_path_name(myarch.component1.subcomp.activity1))
+
+new_arch = clone_architecture(myarch, "Nome da nova classe")
+new_arch.add(PlantumlComponent("Added to the clone"))
+new_arch.component4.set_options(hide=True)
+# new_arch.get_sub_obj_by_name("Myactor 1")
+# new_arch.get_sub_obj_by_name("Actor activity")
+# new_arch.get_sub_obj_by_name("Conn 1")
+# new_arch.get_sub_obj_by_name("Added to the clone")
 
 case3(myarch)
-# myarch.simulate()
-
-# myarch.add(PlantumlComponent("Added to the clone"))
-# myarch.component4.set_options(hide=True)
-# myarch.get_sub_obj_by_name("Myactor 1")
-# myarch.get_sub_obj_by_name("Actor activity")
-# myarch.get_sub_obj_by_name("Conn 1")
-# myarch.get_sub_obj_by_name("Added to the clone")
-
-# print("simulate 2:")
-#myarch.simulate()
-
-case4(myarch)
-
+case4(new_arch)
 
 
 print("simulate arch:")
-case5(myarch)
+mysim = PlantumlSimulation(myarch)
+case5(mysim)
+print("simulate arch 2:")
+case6(mysim)
+
+
+
+# print("\n Old----------------------------------------------------------------------------------------")
+# introspect_object(myarch)
+
+# print("\n New----------------------------------------------------------------------------------------")
+# introspect_object(new_arch)
+
+
+
+
+
+# TODO Create a function to clone architecture.
+# TODO Create class diagram
+# TODO Make simulation work multipiple times. Coroutines are now not allowing running a second time.
+
+

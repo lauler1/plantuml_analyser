@@ -107,14 +107,17 @@ class MyComponent1(PlantumlComponent):
         async def run(self, arch_inst):
             # conn = arch_inst.get_sub_obj_by_name("Conn 1")
             # print(f"New run: Starting async call for {self.name}...")
+            arch_inst.set_simulation_activity_decorator(self)
             result = await self.conn_1.wait_message(arch_inst)
             
-            arch_inst.set_simulation_decorator("alt sucess")
+            arch_inst.set_simulation_decorator("alt #F2F2F2 sucess")
             await self.conn_1.send_message(arch_inst, self, "message 2")
+            arch_inst.set_simulation_activate(self)
             arch_inst.set_simulation_decorator("else error")
             await self.conn_1.send_message(arch_inst, self, "message 3")
             arch_inst.set_simulation_decorator("end")
             # print(f"New run: Async call completed for {self.name}!, result message = {result}")   
+            arch_inst.set_simulation_deactivate(self)
             await self.conn_2.send_message(arch_inst, self, "message 4")
             
     activity1 = MyActivity1("Myactivity 1")
@@ -136,6 +139,7 @@ class MyActor(PlantumlActor):
         async def run(self, arch_inst):
             #conn = arch_inst.get_sub_obj_by_name("Conn 1")
             # print(f"New run: Starting async call for {self.name}...")
+            arch_inst.set_simulation_activity_decorator(self)
             await self.conn_1.send_message(arch_inst, self, "message 1")
             # print(f"New run: Async call completed for {self.name}!")   
 
@@ -160,6 +164,11 @@ class MyArchitecture(PlantumlArchitecture):
     conn1 = PlantumlConnection("Conn 1", actor1.actor_activity, component1.activity1) # , hide=True)
     conn2 = PlantumlConnection("Conn 2", component1.activity1, component2.activity1)
     conn3 = PlantumlConnection("Conn 3", actor1, component1.subcomp)
+    
+    description="""
+This is an example of architecture that can be shown as diagram using PlantUML.<br>
+It can also be simulated.
+    """
 
     def __init__(self, name):
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
@@ -167,7 +176,9 @@ class MyArchitecture(PlantumlArchitecture):
         self.component6 = PlantumlComponent("asdfasdfasfasdfasf")
         self.activity = PlantumlActivity("Self Activity")
 
-@redirect_output_to_html('output/myarch.html', "Architecture test")
+myarch = MyArchitecture("my arch name")
+
+@redirect_output_to_html('output/myarch.html', "Architecture test", myarch.description)
 def case3(myarch):
     # Example with do_plantuml_architecture
     do_plantuml_architecture(myarch)
@@ -182,12 +193,11 @@ def case5(myarch):
     # Example with PlantumlArchitecture simulate
     myarch.simulate()
 
-myarch = MyArchitecture("my arch name")
 # introspect_object(myarch)
 
 case3(myarch)
 print("simulate arch:")
-# case5(myarch)
+case5(myarch)
 # myarch.simulate()
 
 # myarch.add(PlantumlComponent("Added to the clone"))

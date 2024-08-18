@@ -7,6 +7,9 @@ from dataclasses import dataclass, field
 def get_variable_names(obj, namespace):
     return [name for name in namespace if namespace[name] is obj]
 
+def sanitize_name(name):
+    return re.sub(r'\W|^(?=\d)', '_', name.lower())
+
 class PlantumlType:
     """
     Base class for all PlantUML architectural types
@@ -15,6 +18,7 @@ class PlantumlType:
     
     # Class variable to count instances, used for auto name generation
     _instance_count = 0 #: int = field(default=0, init=False, repr=False)
+    description=""
  
     # metadata_dict = {}
     def __init__(self, name="", **options):
@@ -65,7 +69,7 @@ class PlantumlType:
         result = None
         for key, value in vars(self.__class__).items():
             if isinstance(value, PlantumlActivity) and activity == value:
-                result = self.name
+                result = self
                 # print(f"   Found owner of {activity.name}, it is {result}, {key}")
                 return result
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
@@ -74,7 +78,7 @@ class PlantumlType:
                     return result
         for key, value in self.__dict__.items():
             if isinstance(value, PlantumlActivity) and activity == value:
-                result = self.name
+                result = self
                 # print(f"   Found owner of {activity.name}, it is {result}, {key}")
                 return result
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
@@ -210,7 +214,7 @@ skinparam agent {
 }
 skinparam rectangle {
   roundCorne 0
-  BackgroundColor #yellow
+  BackgroundColor #D9FCFF-C6E6FF
   BorderColor #145B17
   FontColor #085D24
 }
@@ -242,14 +246,35 @@ skinparam component {
         # print("  Owners:", owners)
         for owner in owners:
             if owner != None:
-                # print("  Owner:", owner)
-                sanitized_name = re.sub(r'\W|^(?=\d)', '_', owner.lower())
+                color = "#96B1DA"
+                
+                if isinstance(owner, PlantumlActor):
+                    color = "#C6E6FF"
+                # print("  Owner:", owner.name)
+                sanitized_name = re.sub(r'\W|^(?=\d)', '_', owner.name.lower())
                 # print(f'participant "{owner}" as {sanitized_name}')
-                participants[sanitized_name] = f'participant "{owner}" as {sanitized_name}'
+                participants[sanitized_name] = f'participant "{owner.name}" as {sanitized_name} {color}'
         self.metadata_dict['participants'] = participants
 
     def set_simulation_decorator(self, deco_text):
         self.metadata_dict['sequence'].append(deco_text)
+
+    def set_simulation_activate(self, component):
+        if isinstance(component, PlantumlActivity):
+            component = self.get_owner(component)
+        self.metadata_dict['sequence'].append(f"activate {sanitize_name(component.name)}")
+
+    def set_simulation_deactivate(self, component):
+        if isinstance(component, PlantumlActivity):
+            component = self.get_owner(component)
+        self.metadata_dict['sequence'].append(f"deactivate {sanitize_name(component.name)}")
+
+    def set_simulation_activity_decorator(self, component):
+        if not isinstance(component, PlantumlActivity):
+            return
+        owner = self.get_owner(component)
+        self.metadata_dict['sequence'].append(f"rnote over {sanitize_name(owner.name)} #C5FFA6\n{component.name}\nendrnote")
+
 
     async def run(self, activities):
         # Run the list of coroutines concurrently
@@ -264,7 +289,18 @@ skinparam component {
         # for item in activities:
             # print("       Activities: =", item)
         print("@startuml")
-        print("hide footbox")
+        
+        skinparam = """hide footbox
+skinparam roundcorner 0
+skinparam sequence {
+LifeLineBackgroundColor #C5FFA6
+LifeLineBorderColor #095C2E
+ParticipantFontColor #4A4A97
+ParticipantBorderColor #4A4A97
+ParticipantBackgroundColor #96B1DA
+}"""
+
+        print(skinparam)
         # if "skinparam" in self.metadata_dict:
             # print(self.metadata_dict["skinparam"])
 
@@ -330,14 +366,14 @@ class PlantumlConnection(PlantumlType):
     def print_transmission(self, architecture, sender, text):
         send_name = sender.name 
         if isinstance(sender, PlantumlActivity):
-            send_name = architecture.get_owner(sender)
+            send_name = architecture.get_owner(sender).name
 
         other = self.comp1
         if other == sender:
             other = self.comp2
         other_name = other.name 
         if isinstance(sender, PlantumlActivity):
-            other_name = architecture.get_owner(other)
+            other_name = architecture.get_owner(other).name
             
         architecture.metadata_dict['part_seq'].append(re.sub(r'\W|^(?=\d)', '_', send_name.lower()))
         architecture.metadata_dict['part_seq'].append(re.sub(r'\W|^(?=\d)', '_', other_name.lower()))

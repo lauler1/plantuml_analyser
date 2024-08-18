@@ -13,7 +13,7 @@ def escape_html(text: str) -> str:
     text = text.replace("'", "&#39;")
     return text
     
-def redirect_output_to_html(file_name, title):
+def redirect_output_to_html(file_name, title="PlantUML", description="To be defined."):
     def decorator(func):
         """Decorator to capture stdout output of a function."""
         def wrapper(*args, **kwargs):
@@ -24,7 +24,7 @@ def redirect_output_to_html(file_name, title):
 
             try:
                 res = func(*args, **kwargs)
-                generate_html_with_plantuml(new_stdout.getvalue(), file_name, title)
+                generate_html_with_plantuml(new_stdout.getvalue(), file_name, title, description)
             finally:
                 # Reset stdout
                 sys.stdout = old_stdout
@@ -43,7 +43,7 @@ Bob --> Alice: Authentication Response
 @enduml
 """)
 
-def generate_html_with_plantuml(plantuml_script, output_path = "output.html", title="PlantUML"):
+def generate_html_with_plantuml(plantuml_script, output_path = "output.html", title="", description=""):
     """Generate HTML with embedded PlantUML diagram and original script."""
     encoded_script = deflate_and_encode(plantuml_script)
     print("encoded_script = ", encoded_script)
@@ -107,9 +107,12 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
         <h1>{{ title }}</h1>
         <h2>Diagram</h2>
         <img src="{{ img_url }}" alt="PlantUML Diagram">
-        <h2>Original Script</h2>
-        <pre><code class="language-plantuml">{{ plantuml_script }}</code></pre>
-
+        <details>
+            <summary>Show/Hide Code</summary>
+                <pre><code class="language-plantuml">{{ plantuml_script }}</code></pre>
+        </details>    
+        <h2>Description</h2>
+        {{ description }}
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
         <script>
             Prism.languages.plantuml = {
@@ -127,7 +130,7 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
     """
 
     template = jinja2.Template(template_str)
-    html_output = template.render(img_url=img_url, plantuml_script=escape_html(plantuml_script), title=title)
+    html_output = template.render(img_url=img_url, plantuml_script=escape_html(plantuml_script), title=title, description=description)
 
     #output_path = "output.html"
     with open(output_path, "w") as f:

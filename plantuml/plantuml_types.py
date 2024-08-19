@@ -18,6 +18,24 @@ class ObjectRef:
     def __init__(self, ref):
         self.ref = ref
 
+def post_init_decorator(init_func):
+    def wrapper(self, *args, **kwargs):
+        # Call the original __init__ method
+        # print("     wrapper:", args)
+        init_func(self, *args, **kwargs)
+        # Call the post_init method after the original __init__ method
+        self.post_init()
+    return wrapper
+
+def plantuml_architecture_decorator(init_func):
+    def wrapper(self, *args, **kwargs):
+        # Call the original __init__ method
+        # print("   plantuml_architecture_decorator wrapper:", args)
+        init_func(self, *args, **kwargs)
+        # Call the post_init method after the original __init__ method
+        self.arch_post_init()
+    return wrapper
+
 class PlantumlType:
     """
     Base class for all PlantUML architectural types
@@ -29,6 +47,7 @@ class PlantumlType:
     description=""
  
     # metadata_dict = {}
+    @post_init_decorator
     def __init__(self, name="", **options):
         """
         Main constructor.
@@ -41,13 +60,24 @@ class PlantumlType:
         """
         self.name = name
         self.type = "Type"
-        # self.path = name
+        self.path = sanitize_name(name)
         self.metadata_dict = {"hide": False, "remove": False}
+
+        #self.architecture = None
+        self.owner = None
         # print("---->", get_variable_names(self, globals()))
 
-    def __post_init__(self):
+    def post_init(self):
         PlantumlType._instance_count += 1  # Increment the counter
         self.instance_count = PlantumlType._instance_count
+
+        # print("      __post_init__(self):", self.name)
+
+    def set_architecture(self, architecture_ref):
+        # setattr(self, "architecture", ObjectRef(architecture))
+        #self.architecture = architecture_ref
+        self.path = architecture_ref.ref.get_complete_path_name(self)
+        self.owner = ObjectRef(architecture_ref.ref.get_owner())
 
     def add(self, value):
         """
@@ -101,7 +131,9 @@ class PlantumlType:
                     return result
         return result
 
-    def get_owner(self, object):
+    def get_owner(self, object=None):
+        if object == None:
+            object = self
         result = None
         for key, value in vars(self.__class__).items():
             if object == value:
@@ -206,7 +238,7 @@ class PlantumlActor(PlantumlType):
         super().__init__(name)
         self.type = "Actor"
         self.metadata_dict.update(options)
-        super().__post_init__()
+        # super().__post_init__()
 
 class PlantumlComponent(PlantumlType):
     """
@@ -217,7 +249,6 @@ class PlantumlComponent(PlantumlType):
         super().__init__(name)
         self.type = "Component"
         self.metadata_dict.update(options)
-        super().__post_init__()
 
 class PlantumlInterface(PlantumlType):
     """
@@ -228,7 +259,6 @@ class PlantumlInterface(PlantumlType):
         super().__init__(name)
         self.type = "Interface"
         self.metadata_dict.update(options)
-        super().__post_init__()
 
 class PlantumlPort(PlantumlType):
     """
@@ -239,7 +269,6 @@ class PlantumlPort(PlantumlType):
         super().__init__(name)
         self.type = "Port"
         self.metadata_dict.update(options)
-        super().__post_init__()
 
 class PlantumlActivity(PlantumlType):
     """
@@ -250,7 +279,7 @@ class PlantumlActivity(PlantumlType):
         super().__init__(name)
         self.type = "Activity"
         self.metadata_dict.update(options)
-        super().__post_init__()
+        # super().__post_init__()
         
     async def run(self, arch_inst):
         """
@@ -269,6 +298,8 @@ class PlantumlArchitecture(PlantumlType):
     options:
         skinparam="..."
     """
+
+    @plantuml_architecture_decorator
     def __init__(self, name="", **options):
         super().__init__(name)
         self.type = "Architecture"
@@ -303,6 +334,28 @@ skinparam component {
   ArrowFontColor #4D4D4D
 }
 """
+
+    def _recursive_post_init(self, curr_obj):
+        #Add this architecture as attribute of each element instance of PlantumlType
+        for key, value in vars(curr_obj.__class__).items():
+            if isinstance(value, PlantumlType):
+                pass
+                if value.name == "":
+                    value.name = key
+                value.set_architecture(ObjectRef(self))
+                self._recursive_post_init(value)
+        for key, value in curr_obj.__dict__.items():
+            if isinstance(value, PlantumlType):
+                pass
+                if value.name == "":
+                    value.name = key
+                value.set_architecture(ObjectRef(self))
+                self._recursive_post_init(value)
+    
+    def arch_post_init(self):
+        print("    arch_post_init(self):", self.name)
+        self._recursive_post_init(self)
+
 
 class PlantumlConnection(PlantumlType):
     """
@@ -345,16 +398,6 @@ class PlantumlConnection(PlantumlType):
 
 def print_with_indent(text, indent=1):
     print('    ' * indent + text)
-
-def clone_plant_uml_object(object):
-    # for key, value in object.__dict__.items():
-        # if isinstance(value, PlantumlType):
-            # setattr(new_instance, key, clone_plant_uml_object(value))
-        # else:
-            # setattr(new_instance, key, deepcopy(value))
-            
-    return deepcopy(object)
-    
     
 def go_through_connections(object, architecture):
     for key, value in vars(object.__class__).items():
@@ -363,16 +406,9 @@ def go_through_connections(object, architecture):
             owner_name = ""
             if isinstance(owner, PlantumlType):
                 owner_name = owner.name
-            # print(f"  Class connection: {key}, owner={owner_name}, comp1={value.comp1.ref.name}, comp2={value.comp2.ref.name}")
-            # print(f"      insta={value}")
-            # print(f"      owner={owner}")
-            # print(f"      comp1={value.comp1.ref}")
-            # print(f"      comp2={value.comp2.ref}")
             
             comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
             comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
-            # print(f"       New comp1={comp1}")
-            # print(f"       New comp2={comp2}")
             value.set_refs(comp1, comp2)
             
         elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
@@ -384,16 +420,9 @@ def go_through_connections(object, architecture):
             owner_name = ""
             if isinstance(owner, PlantumlType):
                 owner_name = owner.name
-            # print(f"  Objct connection: {key}, owner={owner_name}, comp1={value.comp1.ref.name}, comp2={value.comp2.ref.name}")
-            # print(f"      insta={value}")
-            # print(f"      owner={owner}")
-            # print(f"      comp1={value.comp1.ref}")
-            # print(f"      comp2={value.comp2.ref}")
             
             comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
             comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
-            # print(f"       New comp1={comp1}")
-            # print(f"       New comp2={comp2}")
             value.set_refs(comp1, comp2)
             
         elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
@@ -403,22 +432,16 @@ def go_through_connections(object, architecture):
 def clone_architecture(architecture, new_name, base_class=PlantumlArchitecture):
 
     print("\n----------------------------------------------------------------------------------\nclone_architecture")
-    # print("original class items")
-    # for key, value in vars(architecture.__class__).items():
-        # print_with_indent(f"{key}: {value}")
-    # print("original object items")
-    # for key, value in architecture.__dict__.items():
-        # print_with_indent(f"{key}: {value}")
-    
-    # # Step 1: Get the original class and create a new class with the specified base class
+    # Step 1: Get the original class and create a new class with the specified base class
     OriginalClass = architecture.__class__
 
-    # # Create a new class dynamically that inherits from the given base class
+    # Create a new class dynamically that inherits from the given base class
     NewClass = types.new_class(OriginalClass.__name__, (base_class,), {})
 
     # Step 2: Copy the class attributes and methods from the original class
     for key, value in OriginalClass.__dict__.items():
         if not key.startswith('__'):
+            pass
             # Ensure that functions are correctly bound to the new class
             if isinstance(value, types.FunctionType):
                 value = types.FunctionType(
@@ -429,9 +452,8 @@ def clone_architecture(architecture, new_name, base_class=PlantumlArchitecture):
                     closure=value.__closure__
                 )
                 setattr(NewClass, key, value)
-            # elif isinstance(value, PlantumlType):
-                # setattr(NewClass, key, clone_plant_uml_object(value))
             else:
+                pass
                 setattr(NewClass, key, deepcopy(value))
 
     # Step 3: Create a new instance of this new class
@@ -441,15 +463,6 @@ def clone_architecture(architecture, new_name, base_class=PlantumlArchitecture):
     for key, value in architecture.__dict__.items():
         setattr(new_instance, key, deepcopy(value))
 
-    # print("new class items")
-    # for key, value in vars(new_instance.__class__).items():
-        # print_with_indent(f"{key}: {value}")
-    # print("new object items")
-    # for key, value in new_instance.__dict__.items():
-        # print_with_indent(f"{key}: {value}")
-
-    # print("go_through_connections Original")
-    # go_through_connections(new_instance, architecture)
-    # print("go_through_connections new")
+    # Step 5: Correct all connection references
     go_through_connections(new_instance, new_instance)
     return new_instance

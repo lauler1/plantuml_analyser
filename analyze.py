@@ -7,7 +7,7 @@ from plantuml.plantuml_sequence import do_plantuml_sequence
 from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_object
 from plantuml.redirect_output_to_file import redirect_output_to_file
 from plantuml.generate_plantuml_html import redirect_output_to_html
-from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture
+from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame
 from plantuml.plantuml_simulation import PlantumlSimulation
 
 # Exemplo 1 -------------------------------------------------------------------
@@ -100,29 +100,40 @@ class MySubComponent1(PlantumlComponent):
         self.activity2 = PlantumlActivity("Mysubactivity 2")
         super().__init__(name, **options)
 
-class MyComponent1(PlantumlComponent):
-
-    class MyActivity1(PlantumlActivity):
-        def __init__(self, name, **options):
-            super().__init__(name, **options)
-        async def run(self, simulation):
-            # conn = simulation.get_sub_obj_by_name("Conn 1")
-            # print(f"New run: Starting async call for {self.name}...")
-            simulation.set_simulation_activity_decorator(self)
-            result = await simulation.wait_message(self.conn_1)
-            
-            simulation.set_simulation_decorator("alt #F2F2F2 sucess")
-            await simulation.send_message(self.conn_1, self, "message 2")
-            simulation.set_simulation_activate(self)
-            simulation.set_simulation_decorator("else error")
-            await simulation.send_message(self.conn_1, self, "message 3")
-            simulation.set_simulation_decorator("end")
-            # print(f"New run: Async call completed for {self.name}!, result message = {result}")   
-            simulation.set_simulation_deactivate(self)
-            await simulation.send_message(self.conn_2, self, "message 4")
-            
+class MyActivity1(PlantumlActivity):
     def __init__(self, name, **options):
-        self.activity1 = self.MyActivity1("Myactivity 1")
+        self.conn_1 = None # This connection ref shall bewfulfilled by Reflection
+        self.conn_2 = None # This connection ref shall bewfulfilled by Reflection
+        super().__init__(name, **options)
+        
+    async def run(self, simulation):
+        
+        if self.conn_1 == None or self.conn_2 == None:
+            # To ensure that this simulation ca run.
+            # As the connections are fulfilled by reflection at architecture,
+            # not all instances of this class may be connected
+            return
+        
+        # conn = simulation.get_sub_obj_by_name("Conn 1")
+        # print(f"New run: Starting async call for {self.name}...")
+        simulation.set_simulation_activity_decorator(self)
+        
+        result = await simulation.wait_message(self.conn_1)
+        
+        simulation.set_simulation_decorator("alt #F2F2F2 sucess")
+        await simulation.send_message(self.conn_1, self, "message 2")
+        simulation.set_simulation_activate(self)
+        simulation.set_simulation_decorator("else error")
+        await simulation.send_message(self.conn_1, self, "message 3")
+        simulation.set_simulation_decorator("end")
+        # print(f"New run: Async call completed for {self.name}!, result message = {result}")   
+        simulation.set_simulation_deactivate(self)
+        await simulation.send_message(self.conn_2, self, "message 4")
+            
+class MyComponent1(PlantumlComponent):
+  
+    def __init__(self, name, **options):
+        self.activity1 = MyActivity1("Myactivity 1")
         self.activity2 = MyActivity("Myactivity 2")# , hide=True)
         self.subcomp = MySubComponent1("SubComponent 1", note=r"This is a note\nfor a component")# , remove=True)
         super().__init__(name, **options)
@@ -136,6 +147,7 @@ class MyActor(PlantumlActor):
 
     class MyActorActivity(PlantumlActivity):
         def __init__(self, name, **options):
+            self.conn_1 = None # This connection ref shall bewfulfilled by Reflection
             super().__init__(name, **options)
         async def run(self, simulation):
             #conn = simulation.get_sub_obj_by_name("Conn 1")
@@ -175,15 +187,16 @@ It can also be simulated.
         self.activity = PlantumlActivity("Self Activity")
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
-class MySuperArchitecture(PlantumlArchitecture):
-    
+class MySuperArchitecture(PlantumlArchitecture):  
     description="""
 This is an example of architecture that can be shown as diagram using PlantUML.<br>
 It can also be simulated.
     """
 
     def __init__(self, name):
-        self.sub_architecture = MyArchitecture("my architecture")
+        self.frame = PlantumlFrame("My Frame")
+
+        self.frame.sub_architecture = MyArchitecture("my architecture")
         
         self.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
         self.component_super_arch2 = MyComponent2("Mycomponent_super_arch 2", color="pink;line:red;line.bold;text:red")
@@ -193,7 +206,6 @@ It can also be simulated.
         self.conn4 = PlantumlConnection("Conn 4", self.component_super_arch1, self.component_super_arch2)
 
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
-
 
 myarch = MySuperArchitecture("my super architecture")
 # myarch.arch_post_init()
@@ -227,7 +239,7 @@ def case6(mysim):
 
 new_arch = clone_architecture(myarch, "Nome da nova classe")
 new_arch.add(PlantumlComponent("Added to the clone"))
-new_arch.sub_architecture.component4.set_options(hide=True)
+new_arch.frame.sub_architecture.component4.set_options(hide=True)
 # # new_arch.get_sub_obj_by_name("Myactor 1")
 # # new_arch.get_sub_obj_by_name("Actor activity")
 # # new_arch.get_sub_obj_by_name("Conn 1")
@@ -236,11 +248,11 @@ new_arch.sub_architecture.component4.set_options(hide=True)
 case3(myarch)
 case4(new_arch)
 
-# print("simulate arch:")
-# mysim = PlantumlSimulation(myarch)
-# case5(mysim)
-# print("simulate arch 2:")
-# case6(mysim)
+print("simulate arch:")
+mysim = PlantumlSimulation(myarch)
+case5(mysim)
+print("simulate arch 2:")
+case6(mysim)
 
 
 

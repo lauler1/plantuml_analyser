@@ -64,7 +64,7 @@ class PlantumlType:
         self.metadata_dict = {"hide": False, "remove": False}
 
         #self.architecture = None
-        self.owner = None
+        self.owner = "NONE"
         # print("---->", get_variable_names(self, globals()))
 
     def post_init(self):
@@ -73,21 +73,22 @@ class PlantumlType:
 
         # print("      __post_init__(self):", self.name)
 
-    def set_architecture(self, architecture_ref):
+    def set_architecture(self, architecture):
         # setattr(self, "architecture", ObjectRef(architecture))
         #self.architecture = architecture_ref
-        self.path = architecture_ref.ref.get_complete_path_name(self)
-        self.owner = ObjectRef(architecture_ref.ref.get_owner())
+        self.path = architecture.get_complete_path_name(self)
+        self.owner = ObjectRef(architecture.get_owner(self))
+        # print(f"set_architecture: {self.name} {self.owner} {architecture.get_owner(self)}")
 
     def add(self, value):
         """
         Add a new attribute to the class. The attribute must be instance of PlantumlType or ObjectRef of an instance of PlantumlType.
         """
         if isinstance(value, ObjectRef):
-            print(f"Adding {value.ref.name}")
+            print(f"Adding ref {value.ref.name}")
             sanitized_name = sanitize_name(value.ref.name)
         elif isinstance(value, PlantumlType):
-            print(f"Adding {value.name}")
+            print(f"Adding obj {value.name}")
             sanitized_name = sanitize_name(value.name)
         else:
             return
@@ -131,9 +132,7 @@ class PlantumlType:
                     return result
         return result
 
-    def get_owner(self, object=None):
-        if object == None:
-            object = self
+    def get_owner(self, object):
         result = None
         for key, value in vars(self.__class__).items():
             if object == value:
@@ -213,6 +212,9 @@ class PlantumlType:
         self.__call__ = types.MethodType(new_call_method, self)
 
     def get_all_activities(self, level = 1):
+        """
+        Returns a set of references to activities objects.
+        """
         activities_list = set()
         
         for key, value in vars(self.__class__).items():
@@ -248,6 +250,46 @@ class PlantumlComponent(PlantumlType):
     def __init__(self, name="", **options):
         super().__init__(name)
         self.type = "Component"
+        self.metadata_dict.update(options)
+
+class PlantumlFrame(PlantumlType):
+    """
+    This class defines a PlantUML architectural Frame.
+    See base class PlantumlType for more.
+    """
+    def __init__(self, name="", **options):
+        super().__init__(name)
+        self.type = "Frame"
+        self.metadata_dict.update(options)
+
+class PlantumlFolder(PlantumlType):
+    """
+    This class defines a PlantUML architectural Folder.
+    See base class PlantumlType for more.
+    """
+    def __init__(self, name="", **options):
+        super().__init__(name)
+        self.type = "Folder"
+        self.metadata_dict.update(options)
+
+class PlantumlDatabase(PlantumlType):
+    """
+    This class defines a PlantUML architectural Database.
+    See base class PlantumlType for more.
+    """
+    def __init__(self, name="", **options):
+        super().__init__(name)
+        self.type = "Database"
+        self.metadata_dict.update(options)
+
+class PlantumlPackage(PlantumlType):
+    """
+    This class defines a PlantUML architectural Package.
+    See base class PlantumlType for more.
+    """
+    def __init__(self, name="", **options):
+        super().__init__(name)
+        self.type = "Package"
         self.metadata_dict.update(options)
 
 class PlantumlInterface(PlantumlType):
@@ -333,6 +375,7 @@ skinparam component {
   ArrowColor #5C5C66
   ArrowFontColor #4D4D4D
 }
+skinparam linetype ortho
 """
 
     def _recursive_post_init(self, curr_obj):
@@ -342,14 +385,14 @@ skinparam component {
                 pass
                 if value.name == "":
                     value.name = key
-                value.set_architecture(ObjectRef(self))
+                value.set_architecture(self)
                 self._recursive_post_init(value)
         for key, value in curr_obj.__dict__.items():
             if isinstance(value, PlantumlType):
                 pass
                 if value.name == "":
                     value.name = key
-                value.set_architecture(ObjectRef(self))
+                value.set_architecture(self)
                 self._recursive_post_init(value)
     
     def arch_post_init(self):
@@ -366,15 +409,22 @@ class PlantumlConnection(PlantumlType):
     def __init__(self, name, comp1, comp2, **options):
         """
         Main constructor.
+        
+        More details of lines rules for plantuml, see:
+        - https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
+        - https://crashedmind.github.io/PlantUMLHitchhikersGuide/index.html
+        
         See base class PlantumlType for more.
         options:
             direction: Can be "in", "out" or "inout". Default = "inout".
             line: plantuml connection line/arrow, e.g. "--", "->", "<-",... Default line used is "--"
+            
         """
         super().__init__(name)
         self.type = "ArchView"
         
         self.metadata_dict["direction"] = "inout"
+        # self.metadata_dict["line"] = "--"
 
         self.metadata_dict.update(options)
         

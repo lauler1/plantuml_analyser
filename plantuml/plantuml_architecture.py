@@ -28,10 +28,14 @@ def print_plant_component(name, plantuml_obj, indent=0):
             indent += 1
         else:
             print_with_indent(f"actor \"{name}\" as {path} ${path} {color}", indent)
-    elif isinstance(plantuml_obj, pt.PlantumlComponent):
+    elif isinstance(plantuml_obj, pt.PlantumlComponent) or \
+            isinstance(plantuml_obj, pt.PlantumlFrame) or \
+            isinstance(plantuml_obj, pt.PlantumlFolder) or \
+            isinstance(plantuml_obj, pt.PlantumlDatabase) or \
+            isinstance(plantuml_obj, pt.PlantumlPackage):
         if plantuml_obj.has_sub_objs():
             extra = "{"
-        print_with_indent(f"component \"{name}\" as {path} ${path} {color}{extra}", indent)
+        print_with_indent(f"{plantuml_obj.type} \"{name}\" as {path} ${path} {color}{extra}", indent)
     elif isinstance(plantuml_obj, pt.PlantumlInterface):
         print_with_indent(f"interface \"{name}\" as {path} ${path} {color}", indent)
     elif isinstance(plantuml_obj, pt.PlantumlPort):
@@ -119,11 +123,15 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
                             connections.update(create_plant_comonnection(value.name, value, indent))
                     else:
                         print_plant_component(value.name, value, indent)
-                    
 
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection):# and is_container(value):
                     introspect(value, connections, indent+1)
-                if isinstance(value, pt.PlantumlComponent) or isinstance(value, pt.PlantumlActor):
+                if isinstance(value, pt.PlantumlComponent) or\
+                    isinstance(value, pt.PlantumlActor) or \
+                    isinstance(value, pt.PlantumlFrame) or \
+                    isinstance(value, pt.PlantumlFolder) or \
+                    isinstance(value, pt.PlantumlDatabase) or \
+                    isinstance(value, pt.PlantumlPackage):
                     if value.has_sub_objs():
                         print_with_indent("}", indent)
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection) and value.metadata_dict['hide'] == True:

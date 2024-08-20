@@ -9,13 +9,31 @@ class PlantumlSimulation():
     """
     This class defines a PlantUML Simulation, which can generate sequence diagrams
     """
-    def __init__(self, architecture, name=""):
+    def __init__(self, architecture, name="", **options):
+        """
+        Simulates an architecture and generates a sequence diagram.
+        
+        architecture: An architecture to be simulated.
+        name: Simulation name.
+        options:
+            comp_order: List of components paths inside the architecture. Used to prioritize participant showed in the sequence in the diagram.
+        """
         self.name = name
         self.architecture = architecture
         self.participants = {}
         self.part_seq = [] # Store seq of participants during a simulation simulation.
         self.sequence = [] # Store sequence of activities during a simulation simulation
         self.queues = {}
+        
+        self.metadata_dict = {"comp_order":[]}
+        self.metadata_dict.update(options)
+
+    def set_options(self, **options):
+        """
+        Update the options, refer to the main constructor for more details.
+        """
+        # Update the metadata_dict with the provided options
+        self.metadata_dict.update(options)
         
     def gather_participants(self, activities):
         owners = set()
@@ -43,6 +61,7 @@ class PlantumlSimulation():
     def set_simulation_activate(self, component):
         if isinstance(component, pt.PlantumlActivity):
             component = component.owner.ref # self.architecture.get_activity_owner(component)
+        self.part_seq.append(component.path)
         self.sequence.append(f"  activate {component.path}")
 
     def set_simulation_deactivate(self, component):
@@ -57,7 +76,28 @@ class PlantumlSimulation():
         owner2 = self.architecture.get_owner(component)
         
         #print(f"  Owner = {component.name} {component.owner} {component.owner.ref} {owner.path} {owner2.path}")
+        self.part_seq.append(component.owner.ref.path)
         self.sequence.append(f"  rnote over {component.owner.ref.path} #C5FFA6\n{component.name}\n  endrnote")
+
+    def set_simulation_state_decorator(self, component, state_str):
+        if not isinstance(component, pt.PlantumlActivity):
+            return
+        owner = self.architecture.get_activity_owner(component)
+        owner2 = self.architecture.get_owner(component)
+        
+        #print(f"  Owner = {component.name} {component.owner} {component.owner.ref} {owner.path} {owner2.path}")
+        self.part_seq.append(component.owner.ref.path)
+        self.sequence.append(f"  hnote over {component.owner.ref.path} #C6E6FF\n{state_str}\n  endrnote")
+        
+    def set_simulation_note_decorator(self, component, note_str):
+        if not isinstance(component, pt.PlantumlActivity):
+            return
+        owner = self.architecture.get_activity_owner(component)
+        owner2 = self.architecture.get_owner(component)
+        
+        #print(f"  Owner = {component.name} {component.owner} {component.owner.ref} {owner.path} {owner2.path}")
+        self.part_seq.append(component.owner.ref.path)
+        self.sequence.append(f"  note over {component.owner.ref.path}\n{note_str}\n  endrnote")
 
     async def run(self, activities):
         # Run the list of coroutines concurrently
@@ -68,6 +108,9 @@ class PlantumlSimulation():
         self.part_seq = [] # clear part_seq from previous simulation
         self.sequence = [] # clear sequence
         self.queues = {}   # clear queues
+
+        # Add some priority participant to the sequence in the diagram.
+        self.part_seq += self.metadata_dict["comp_order"]
         
         print("@startuml")
         skinparam = """hide footbox
@@ -121,24 +164,37 @@ ParticipantBackgroundColor #96B1DA
         if isinstance(sender, pt.PlantumlActivity):
             send_path = sender.owner.ref.path 
             
-        if isinstance(connection, pt.ObjectRef):
+        if isinstance(connection, pt.ObjectRef): # Maybe unecessary, to check
             connection = connection.ref
 
-        other = connection.comp1.ref
-        if other == sender:
-            other = connection.comp2.ref
-        other_path = other.path 
-        if isinstance(other, pt.PlantumlActivity):
-            other_path = other.owner.ref.path 
-        # send_path = sanitize_name(send_name)
-        # other_path = sanitize_name(other_name)
-        self.part_seq.append(send_path)
-        self.part_seq.append(other_path)
-        self.sequence.append(f"{send_path} -> {other_path}: {text}")
+        other = connection.comp2
+        # other = connection.comp2.ref
+        # if other == sender:
+            # other = connection.comp1.ref
+            
+        # It can be a list of trasmission refs or a single transmission ref.
+        # To simplify, treat all as list
+        if isinstance(other, list):
+            # This happens only in case send 1 to multiple
+            destinations = other
+        else:
+            # This can happen bedirectionaly
+            if other.ref == sender:
+                other = connection.comp1
+            destinations = [other]
+            
+        for dest in destinations:
+            other_path = dest.ref.path
+            
+            if isinstance(dest.ref, pt.PlantumlActivity):
+                other_path = dest.ref.owner.ref.path 
+            self.part_seq.append(send_path)
+            self.part_seq.append(other_path)
+            self.sequence.append(f"{send_path} -> {other_path}: {text}")
         
     async def send_message(self, connection, sender, lable, data=""):
         """
-        Sends a message in the queue.
+        Sends a message to the queue (or to multiple output queues of the connection).
         This method also yields the control to the event loop after sending.
         """
         if connection == None:
@@ -148,11 +204,17 @@ ParticipantBackgroundColor #96B1DA
         if lable == None:
             return
         self.print_transmission(connection, sender, lable)
-        await self.get_queue(connection).put({"label":lable, "data":data})
+        
+        queue = self.get_queue(connection)
+        if isinstance(queue, list):
+            for queue_item in queue:
+                await self.get_queue(connection).put({"label":lable, "data":data})
+        else:
+            await self.get_queue(connection).put({"label":lable, "data":data})
 
     async def send_message_and_wait(self, connection, sender, lable, data=""):
         """
-        Sends a message and waits for an answer in the queue.
+        Sends a message and waits for an answer in the bedirectional queue.
         """
         if connection == None:
             return
@@ -167,7 +229,7 @@ ParticipantBackgroundColor #96B1DA
 
     async def wait_message(self, connection):
         """
-        Waits for a message in the queue.
+        Waits for a message in the queue (or multiple input queues).
         """
         if connection == None:
             return

@@ -90,6 +90,37 @@ def case2():
 case1()
 case2()
 
+async def state_machine_run(self, simulation):
+    if self.sm_conn == None:
+        # To ensure that this simulation ca run.
+        # As the connections are fulfilled by reflection at architecture,
+        # not all instances of this class may be connected
+        return
+        
+    simulation.set_simulation_state_decorator(self, "State 1")
+    result = await simulation.wait_message(self.sm_conn)
+    simulation.set_simulation_state_decorator(self, f"State 2 {result}")
+    result = await simulation.wait_message(self.sm_conn)
+    simulation.set_simulation_state_decorator(self, f"State 3 {result}")
+
+async def subactivity_2_run(self, simulation):
+    if self.multiple_conn == None:
+        # To ensure that this simulation ca run.
+        # As the connections are fulfilled by reflection at architecture,
+        # not all instances of this class may be connected
+        return
+    result = await simulation.send_message(self.multiple_conn, self, "subactivity_2 message")
+
+async def sm_send_run(self, simulation):
+    if self.sm_conn == None:
+        # To ensure that this simulation ca run.
+        # As the connections are fulfilled by reflection at architecture,
+        # not all instances of this class may be connected
+        return
+    await asyncio.sleep(0)
+    # await simulation.wait_message(self.sm_conn)
+    result = await simulation.send_message(self.sm_conn, self, "SM message", self.name)
+
 class MyActivity(PlantumlActivity):
     def __init__(self, name, **options):
         super().__init__(name, **options)
@@ -179,12 +210,22 @@ It can also be simulated.
         self.component5 = PlantumlComponent()
         self.class_activity = PlantumlActivity("Class Activity")
         
+        self.component6 = PlantumlComponent("PlantumlComponent 6")
+        self.component6.state_activity = PlantumlActivity("State Machine")
+        self.component6.state_activity.state_conn_1 = None
+        self.component6.state_activity.replace_run_method(state_machine_run)
+        
+        self.component1.subcomp.activity2.replace_run_method(subactivity_2_run)
+        self.class_activity.replace_run_method(sm_send_run)
+        self.component1.activity2.replace_run_method(sm_send_run)
+        
         self.conn1 = PlantumlConnection("Conn 1", self.actor1.actor_activity, self.component1.activity1) # , hide=True)
         self.conn2 = PlantumlConnection("Conn 2", self.component1.activity1, self.component2.activity1)
         self.conn3 = PlantumlConnection("Conn 3", self.actor1, self.component1.subcomp)
-        
-        self.component6 = PlantumlComponent("asdfasdfasfasdfasf")
-        self.activity = PlantumlActivity("Self Activity")
+
+        self.sm_conn = PlantumlConnection("SM Conn", [self.class_activity, self.component1.activity2], self.component6.state_activity)
+        self.mlt_conn = PlantumlConnection("Multiple Conn", self.component1.subcomp.activity2, [self.class_activity, self.component1.activity1])
+
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
 class MySuperArchitecture(PlantumlArchitecture):  
@@ -249,9 +290,19 @@ case3(myarch)
 case4(new_arch)
 
 print("simulate arch:")
-mysim = PlantumlSimulation(myarch)
+mysim = PlantumlSimulation(myarch, comp_order=[\
+            myarch.frame.sub_architecture.actor1.path,\
+            myarch.frame.sub_architecture.component1.path,\
+            myarch.frame.sub_architecture.component1.subcomp.path,\
+            myarch.frame.sub_architecture.path])
 case5(mysim)
-print("simulate arch 2:")
+# print("simulate arch 2:")
+mysim.set_options(comp_order=[\
+            myarch.frame.sub_architecture.actor1.path,\
+            myarch.frame.sub_architecture.component1.path,\
+            myarch.frame.sub_architecture.path,\
+            myarch.frame.sub_architecture.component1.subcomp.path,\
+            myarch.frame.sub_architecture.component2.path])
 case6(mysim)
 
 
@@ -263,5 +314,5 @@ case6(mysim)
 # introspect_object(new_arch)
 
 # TODO Create class diagram
-# TODO State machine in simulation (sequence diagram)
 
+# A version of PlantumlConnection used only to align components on the screen: https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html

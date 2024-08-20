@@ -108,7 +108,7 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
         <h2>Diagram</h2>
         <img src="{{ img_url }}" alt="PlantUML Diagram">
         <details>
-            <summary>Show/Hide Code</summary>
+            <summary>Show/Hide PlantUML Code</summary>
                 <pre><code class="language-plantuml">{{ plantuml_script }}</code></pre>
         </details>    
         <h2>Description</h2>

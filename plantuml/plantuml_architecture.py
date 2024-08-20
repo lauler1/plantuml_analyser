@@ -57,10 +57,25 @@ def create_plant_comonnection(name, plantuml_obj, indent=0):
     elif plantuml_obj.metadata_dict["direction"] == "in":
         line = "<-"
 
-    elif isinstance(plantuml_obj, pt.PlantumlConnection):
+    conn_str = ""
+    if isinstance(plantuml_obj.comp1, list):
+        path2 = plantuml_obj.comp2.ref.path
+        for item in plantuml_obj.comp1:
+            path1 = item.ref.path
+            conn_str += f"{path1} {line} {path2} {color} : {name}\n"
+        
+    elif isinstance(plantuml_obj.comp2, list):
+        path1 = plantuml_obj.comp1.ref.path
+        for item in plantuml_obj.comp2:
+            path2 = item.ref.path
+            conn_str += f"{path1} {line} {path2} {color} : {name}\n"
+        # path2 = plantuml_obj.comp2.ref.path
+        # return {name:f"{path1} {line} {path2} {color} : {name}"}
+    else:
         path1 = plantuml_obj.comp1.ref.path
         path2 = plantuml_obj.comp2.ref.path
-        return {name:f"{path1} {line} {path2} {color} : {name}"}
+        conn_str = f"{path1} {line} {path2} {color} : {name}"
+    return {name:conn_str}
 
 
 # Function to recursively pretty-print the AST
@@ -149,6 +164,7 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
         print(plantuml_arch.metadata_dict["skinparam"])
     introspect(plantuml_arch, connections, 0)
     
+    # print all connections only in the end.
     for value in connections.values():
         print(value)
     

@@ -85,10 +85,10 @@ class PlantumlType:
         Add a new attribute to the class. The attribute must be instance of PlantumlType or ObjectRef of an instance of PlantumlType.
         """
         if isinstance(value, ObjectRef):
-            print(f"Adding ref {value.ref.name}")
+            # print(f"Adding ref {value.ref.name}")
             sanitized_name = sanitize_name(value.ref.name)
         elif isinstance(value, PlantumlType):
-            print(f"Adding obj {value.name}")
+            # print(f"Adding obj {value.name}")
             sanitized_name = sanitize_name(value.name)
         else:
             return
@@ -96,7 +96,7 @@ class PlantumlType:
         # Set the attribute on the class instance using reflection
         setattr(self, sanitized_name, value)
         
-        print(f"Added attribute: {sanitized_name} = {value} to {self.name}")
+        # print(f"Added attribute: {sanitized_name} = {value} to {self.name}")
 
     def has_sub_objs(self) -> bool:
         # Iterate over all attributes of the object
@@ -156,7 +156,7 @@ class PlantumlType:
         result = None
         for key, value in self.__dict__.items():
             if isinstance(value, PlantumlType) and value.name == name:
-                print (f"  Found obj '{name}' at instance level")
+                # print (f"  Found obj '{name}' at instance level")
                 return value
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
                 result = value.find_sub_obj_by_name_recursive(name)
@@ -164,7 +164,7 @@ class PlantumlType:
                     return result
         for key, value in vars(self.__class__).items():
             if isinstance(value, PlantumlType) and value.name == name:
-                print (f"  Found obj '{name}' at class level")
+                # print (f"  Found obj '{name}' at class level")
                 return value
             elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
                 result = value.find_sub_obj_by_name_recursive(name)
@@ -176,11 +176,11 @@ class PlantumlType:
     def get_sub_obj_by_name(self, name):
         for key, value in self.__dict__.items():
             if isinstance(value, PlantumlType) and value.name == name:
-                print (f"  Found obj '{name}' at instance level")
+                # print (f"  Found obj '{name}' at instance level")
                 return value
         for key, value in vars(self.__class__).items():
             if isinstance(value, PlantumlType) and value.name == name:
-                print (f"  Found obj '{name}' at class level")
+                # print (f"  Found obj '{name}' at class level")
                 return value
         print (f"Obj '{name}' not found")
         return None
@@ -322,6 +322,9 @@ class PlantumlActivity(PlantumlType):
         self.type = "Activity"
         self.metadata_dict.update(options)
         # super().__post_init__()
+
+    def replace_run_method(self, new_call_method):
+        self.run = types.MethodType(new_call_method, self)
         
     async def run(self, arch_inst):
         """
@@ -345,7 +348,10 @@ class PlantumlArchitecture(PlantumlType):
     def __init__(self, name="", **options):
         super().__init__(name)
         self.type = "Architecture"
-        self.metadata_dict["skinparam"] = """skinparam note{
+        self.metadata_dict["skinparam"] = """
+left to right direction
+'top to bottom direction
+skinparam note{
   BackgroundColor #FFFFCB
   BorderColor #FFCC66
 }
@@ -396,7 +402,7 @@ skinparam linetype ortho
                 self._recursive_post_init(value)
     
     def arch_post_init(self):
-        print("    arch_post_init(self):", self.name)
+        # print("    arch_post_init(self):", self.name)
         self._recursive_post_init(self)
 
 
@@ -414,7 +420,11 @@ class PlantumlConnection(PlantumlType):
         - https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
         - https://crashedmind.github.io/PlantUMLHitchhikersGuide/index.html
         
+        A copnnection can connect components and activities. Only activities can be simulated. Multiple components to single and single to multiple are allowed, but they are unidiretional. Multiple to multiple are not allowed. Multiple activities to single activity will be simulated using single shared queue, and the direction of communication must be from multiple to the single. Single activity to multiple activities will use separate queues for each destination, and the direction of communication must be from the single to multiple.
+        
         See base class PlantumlType for more.
+        comp1: First end component of the connection. It can be a single component, activity or a list of components.
+        comp2: Second end component of the connection. It can be a single component, activity or a list of components.
         options:
             direction: Can be "in", "out" or "inout". Default = "inout".
             line: plantuml connection line/arrow, e.g. "--", "->", "<-",... Default line used is "--"
@@ -431,20 +441,36 @@ class PlantumlConnection(PlantumlType):
         self.set_refs(comp1, comp2)
 
     def set_refs(self, comp1, comp2):
-        assert isinstance(comp1, PlantumlActivity) or isinstance(comp1, PlantumlActor) or isinstance(comp1, PlantumlComponent), "comp1 must be of type PlantumlActivity, PlantumlActor or PlantumlComponent"
+        assert isinstance(comp1, PlantumlActivity) or isinstance(comp1, PlantumlActor) or isinstance(comp1, PlantumlComponent) or isinstance(comp1, list), "comp1 must be of type PlantumlActivity, PlantumlActor or PlantumlComponent"
         
         if isinstance(comp1, PlantumlActivity):
-            assert isinstance(comp2, PlantumlActivity), "PlantumlActivity can only be connected to other PlantumlActivity"
-
-        if not isinstance(comp1, PlantumlActivity):
+            assert isinstance(comp2, PlantumlActivity) or isinstance(comp2, list), "PlantumlActivity can only be connected to other PlantumlActivity"
+        if not isinstance(comp1, PlantumlActivity) and not isinstance(comp1, list):
             assert not isinstance(comp2, PlantumlActivity), "PlantumlActivity can only be connected to other PlantumlActivity"
+        if isinstance(comp1, list):
+            assert not isinstance(comp2, list), "Multiple to multiple connection is not allowed."
 
-        self.comp1 = ObjectRef(comp1)
-        self.comp2 = ObjectRef(comp2)
+        if isinstance(comp1, list):
+            self.metadata_dict["direction"] = "out"
+            self.comp1 = []
+            for item in comp1:
+                self.comp1.append(ObjectRef(item))
+                item.add(ObjectRef(self))
+        else:
+            self.comp1 = ObjectRef(comp1)
+            # Also creates the connection inside the componets
+            self.comp1.ref.add(ObjectRef(self)) # Also creates the connection inside the componets
 
-        # Also creates the connection inside the componets
-        self.comp1.ref.add(ObjectRef(self))
-        self.comp2.ref.add(ObjectRef(self))
+        if isinstance(comp2, list):
+            self.metadata_dict["direction"] = "out"
+            self.comp2 = []
+            for item in comp2:
+                self.comp2.append(ObjectRef(item))
+                item.add(ObjectRef(self)) # Also creates the connection inside the componets
+        else:
+            self.comp2 = ObjectRef(comp2)
+            # Also creates the connection inside the componets
+            self.comp2.ref.add(ObjectRef(self))
 
 def print_with_indent(text, indent=1):
     print('    ' * indent + text)
@@ -457,8 +483,22 @@ def go_through_connections(object, architecture):
             if isinstance(owner, PlantumlType):
                 owner_name = owner.name
             
-            comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
-            comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+            # Reconstruct comp1 with the new references
+            if isinstance(value.comp1, list):
+                comp1 = []
+                for item in value.comp1:
+                    comp1.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
+            else:
+                comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
+            
+            # Reconstruct comp2 with the new references
+            if isinstance(value.comp2, list):
+                comp2 = []
+                for item in value.comp2:
+                    comp2.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
+            else:
+                comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+            
             value.set_refs(comp1, comp2)
             
         elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
@@ -471,8 +511,22 @@ def go_through_connections(object, architecture):
             if isinstance(owner, PlantumlType):
                 owner_name = owner.name
             
-            comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
-            comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+            # Reconstruct comp1 with the new references
+            if isinstance(value.comp1, list):
+                comp1 = []
+                for item in value.comp1:
+                    comp1.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
+            else:
+                comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
+            
+            # Reconstruct comp2 with the new references
+            if isinstance(value.comp2, list):
+                comp2 = []
+                for item in value.comp2:
+                    comp2.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
+            else:
+                comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+            
             value.set_refs(comp1, comp2)
             
         elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):

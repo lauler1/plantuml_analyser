@@ -28,6 +28,9 @@ def print_plant_component(name, plantuml_obj, indent=0):
             indent += 1
         else:
             print_with_indent(f"actor \"{name}\" as {path} ${path} {color}", indent)
+    elif isinstance(plantuml_obj, pt.PlantumlGroup):
+        if plantuml_obj.has_sub_objs():
+            print_with_indent(f"{plantuml_obj.type} {{", indent)
     elif isinstance(plantuml_obj, pt.PlantumlComponent) or \
             isinstance(plantuml_obj, pt.PlantumlFrame) or \
             isinstance(plantuml_obj, pt.PlantumlFolder) or \
@@ -49,13 +52,13 @@ def create_plant_comonnection(name, plantuml_obj, indent=0):
     if "color" in plantuml_obj.metadata_dict:
         color = "#"+plantuml_obj.metadata_dict["color"]
     
-    line = "--"
+    line = "-[norank]-"
     if "line" in plantuml_obj.metadata_dict:
         line = plantuml_obj.metadata_dict["line"]
     elif plantuml_obj.metadata_dict["direction"] == "out":
-        line = "->"
+        line = "-[norank]->"
     elif plantuml_obj.metadata_dict["direction"] == "in":
-        line = "<-"
+        line = "<-[norank]-"
 
     conn_str = ""
     if isinstance(plantuml_obj.comp1, list):
@@ -129,12 +132,19 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
     """
     def introspect(obj, connections, indent):
         path = ""
+        
+        # First add the layout_connectors to the connections dictionary
+        if isinstance(obj, pt.PlantumlArchitecture) and "layout_connectors" in obj.metadata_dict:
+            for value in obj.metadata_dict["layout_connectors"]:
+                str = f"{value[0].ref.path} {value[1]} {value[2].ref.path}"
+                connections.update({str:str})
         for name, value in inspect.getmembers(obj):
             if not inspect.isroutine(value) and not name.startswith('__'):
                 if isinstance(value, pt.PlantumlType):
                     path = value.path
                     if isinstance(value, pt.PlantumlConnection):
                         if value.metadata_dict['hide'] == False and value.metadata_dict['remove'] == False:
+                            # Add this connection to the connections dictionary
                             connections.update(create_plant_comonnection(value.name, value, indent))
                     else:
                         print_plant_component(value.name, value, indent)
@@ -142,6 +152,7 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection):# and is_container(value):
                     introspect(value, connections, indent+1)
                 if isinstance(value, pt.PlantumlComponent) or\
+                    isinstance(value, pt.PlantumlGroup) or \
                     isinstance(value, pt.PlantumlActor) or \
                     isinstance(value, pt.PlantumlFrame) or \
                     isinstance(value, pt.PlantumlFolder) or \
@@ -156,10 +167,14 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
                 if isinstance(value, pt.PlantumlType) and "note" in value.metadata_dict:
                     
                     note_path = path+"_note"
-                    print_with_indent(f"note \"{value.metadata_dict['note']}\" as {note_path}", indent)
-                    print_with_indent(f"{note_path} ~ {path}", indent)
-    connections = {}
+                    # Add this note with its connection to the connections dictionary
+                    connections.update({note_path: f"note \"{value.metadata_dict['note']}\" as {note_path}\n{note_path} ~ {path}"})
+
+
+    connections = {} # Use dictionary to avoid duplications
     print("@startuml")
+    if "orientation" in plantuml_arch.metadata_dict:
+        print(plantuml_arch.metadata_dict["orientation"])
     if "skinparam" in plantuml_arch.metadata_dict:
         print(plantuml_arch.metadata_dict["skinparam"])
     introspect(plantuml_arch, connections, 0)
@@ -167,5 +182,6 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
     # print all connections only in the end.
     for value in connections.values():
         print(value)
+
     
     print("@enduml")

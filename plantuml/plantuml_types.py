@@ -231,6 +231,17 @@ class PlantumlType:
 
         return activities_list
 
+class PlantumlGroup(PlantumlType):
+    """
+    This class defines a PlantUML architectural 'together' to group components without any visible box.
+    See base class PlantumlType for more.
+    """
+    def __init__(self, name="", **options):
+        super().__init__(name)
+        self.type = "together"
+        self.metadata_dict.update(options)
+        # super().__post_init__()
+
 class PlantumlActor(PlantumlType):
     """
     This class defines a PlantUML architectural Actor.
@@ -339,6 +350,9 @@ class PlantumlArchitecture(PlantumlType):
     """
     This class defines a PlantUML Architecture.
     This class defines the 'skinparam' attribute for all components (plantuml syntax). It can be replaced using parma skinparam="..."
+    
+    You can define the variables layout_combine_vertical and layout_combine_horizontal inside the class as list of tuples to define invisible connections between two componnents to force some layout pattern. e.g. = [(self.comp1, self.comp2), (self.comp3, self.comp4)] will connect comp1 with comp2 and comp3 with comp4.
+    
     See base class PlantumlType for more.
     options:
         skinparam="..."
@@ -348,9 +362,10 @@ class PlantumlArchitecture(PlantumlType):
     def __init__(self, name="", **options):
         super().__init__(name)
         self.type = "Architecture"
+        self.metadata_dict["layout_connectors"] = []
+        # self.metadata_dict["orientation"] = "left to right direction"
+        self.metadata_dict["orientation"] = "top to bottom direction"
         self.metadata_dict["skinparam"] = """
-left to right direction
-'top to bottom direction
 skinparam note{
   BackgroundColor #FFFFCB
   BorderColor #FFCC66
@@ -388,14 +403,12 @@ skinparam linetype ortho
         #Add this architecture as attribute of each element instance of PlantumlType
         for key, value in vars(curr_obj.__class__).items():
             if isinstance(value, PlantumlType):
-                pass
                 if value.name == "":
                     value.name = key
                 value.set_architecture(self)
                 self._recursive_post_init(value)
         for key, value in curr_obj.__dict__.items():
             if isinstance(value, PlantumlType):
-                pass
                 if value.name == "":
                     value.name = key
                 value.set_architecture(self)
@@ -404,7 +417,21 @@ skinparam linetype ortho
     def arch_post_init(self):
         # print("    arch_post_init(self):", self.name)
         self._recursive_post_init(self)
+        self.do_layout_combinations()
 
+    def do_layout_combinations(self):
+        # Create some invisible plantuml connections to try to fix components in relative positions
+        self.metadata_dict["layout_connectors"] = []
+        if hasattr(self, 'layout_combine_vertical'):
+            for item in self.layout_combine_vertical:
+                # Store a tuple
+                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[hidden]d-", ObjectRef(item[1])))
+                # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]d- {item[1].path}")
+        if hasattr(self, 'layout_combine_horizontal'):
+            for item in self.layout_combine_vertical:
+                # Store a tuple
+                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[hidden]r-", ObjectRef(item[1])))
+                # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]r- {item[1].path}")
 
 class PlantumlConnection(PlantumlType):
     """
@@ -476,59 +503,35 @@ def print_with_indent(text, indent=1):
     print('    ' * indent + text)
     
 def go_through_connections(object, architecture):
+    def proc_value(value):
+        owner = architecture.get_owner(value)
+        owner_name = ""
+        if isinstance(owner, PlantumlType):
+            owner_name = owner.name
+        # Reconstruct comp1 with the new references
+        if isinstance(value.comp1, list):
+            comp1 = []
+            for item in value.comp1:
+                comp1.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
+        else:
+            comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
+        # Reconstruct comp2 with the new references
+        if isinstance(value.comp2, list):
+            comp2 = []
+            for item in value.comp2:
+                comp2.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
+        else:
+            comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
+        value.set_refs(comp1, comp2)
+
     for key, value in vars(object.__class__).items():
         if isinstance(value, PlantumlConnection):
-            owner = architecture.get_owner(value)
-            owner_name = ""
-            if isinstance(owner, PlantumlType):
-                owner_name = owner.name
-            
-            # Reconstruct comp1 with the new references
-            if isinstance(value.comp1, list):
-                comp1 = []
-                for item in value.comp1:
-                    comp1.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
-            else:
-                comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
-            
-            # Reconstruct comp2 with the new references
-            if isinstance(value.comp2, list):
-                comp2 = []
-                for item in value.comp2:
-                    comp2.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
-            else:
-                comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
-            
-            value.set_refs(comp1, comp2)
-            
+            proc_value(value)
         elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
-            result = value.get_owner(object)
             go_through_connections(value, architecture)
     for key, value in object.__dict__.items():
         if isinstance(value, PlantumlConnection):
-            owner = architecture.get_owner(value)
-            owner_name = ""
-            if isinstance(owner, PlantumlType):
-                owner_name = owner.name
-            
-            # Reconstruct comp1 with the new references
-            if isinstance(value.comp1, list):
-                comp1 = []
-                for item in value.comp1:
-                    comp1.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
-            else:
-                comp1 = architecture.find_sub_obj_by_name_recursive(value.comp1.ref.name)
-            
-            # Reconstruct comp2 with the new references
-            if isinstance(value.comp2, list):
-                comp2 = []
-                for item in value.comp2:
-                    comp2.append(architecture.find_sub_obj_by_name_recursive(item.ref.name))
-            else:
-                comp2 = architecture.find_sub_obj_by_name_recursive(value.comp2.ref.name)
-            
-            value.set_refs(comp1, comp2)
-            
+            proc_value(value)
         elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
             go_through_connections(value, architecture)
 

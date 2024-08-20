@@ -7,7 +7,7 @@ from plantuml.plantuml_sequence import do_plantuml_sequence
 from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_object
 from plantuml.redirect_output_to_file import redirect_output_to_file
 from plantuml.generate_plantuml_html import redirect_output_to_html
-from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame
+from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup
 from plantuml.plantuml_simulation import PlantumlSimulation
 
 # Exemplo 1 -------------------------------------------------------------------
@@ -215,6 +215,8 @@ It can also be simulated.
         self.component6.state_activity.state_conn_1 = None
         self.component6.state_activity.replace_run_method(state_machine_run)
         
+        self.layout_combine_vertical = [(self.component2, self.component6)]
+        
         self.component1.subcomp.activity2.replace_run_method(subactivity_2_run)
         self.class_activity.replace_run_method(sm_send_run)
         self.component1.activity2.replace_run_method(sm_send_run)
@@ -236,16 +238,18 @@ It can also be simulated.
 
     def __init__(self, name):
         self.frame = PlantumlFrame("My Frame")
-
         self.frame.sub_architecture = MyArchitecture("my architecture")
         
-        self.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
-        self.component_super_arch2 = MyComponent2("Mycomponent_super_arch 2", color="pink;line:red;line.bold;text:red")
-
+        self.group1 = PlantumlGroup()
+        self.group1.component_super_arch2 = MyComponent2("Mycomponent_super_arch 2", color="pink;line:red;line.bold;text:red")
+        self.group1.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
         self.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3")
-        
-        self.conn4 = PlantumlConnection("Conn 4", self.component_super_arch1, self.component_super_arch2)
+        self.conn4 = PlantumlConnection("Conn 4", self.group1.component_super_arch1, self.group1.component_super_arch2)
 
+        # Create some invisible plantuml connections to try to fix components in relative positions
+        #self.layout_combine_vertical = [(self.component_super_arch1, self.frame.sub_architecture.component1)]
+        self.layout_combine_vertical = [(self.group1.component_super_arch1, self.frame), (self.frame, self.group1.component_super_arch2)]
+        
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
 myarch = MySuperArchitecture("my super architecture")

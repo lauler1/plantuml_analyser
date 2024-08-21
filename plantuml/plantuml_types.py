@@ -446,6 +446,7 @@ class PlantumlConnection(PlantumlType):
         More details of lines rules for plantuml, see:
         - https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
         - https://crashedmind.github.io/PlantUMLHitchhikersGuide/index.html
+        - https://isgb.otago.ac.nz/infosci/mark.george/Wiki/wiki/PlantUML%20GraphViz%20Layout
         
         A copnnection can connect components and activities. Only activities can be simulated. Multiple components to single and single to multiple are allowed, but they are unidiretional. Multiple to multiple are not allowed. Multiple activities to single activity will be simulated using single shared queue, and the direction of communication must be from multiple to the single. Single activity to multiple activities will use separate queues for each destination, and the direction of communication must be from the single to multiple.
         

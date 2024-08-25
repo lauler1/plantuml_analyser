@@ -18,6 +18,14 @@ class ObjectRef:
     def __init__(self, ref):
         self.ref = ref
 
+class ArchBreakLine():
+    """
+    This class defines a PlantUML architectural breakline in the architecture layout.
+    This function has no other function.
+    """
+    def __init__(self, name="", **options):
+        self.type = "BreakLine"
+
 def post_init_decorator(init_func):
     def wrapper(self, *args, **kwargs):
         # Call the original __init__ method
@@ -66,6 +74,7 @@ class PlantumlType:
         #self.architecture = None
         self.owner = "NONE"
         # print("---->", get_variable_names(self, globals()))
+        self.metadata_dict.update({"rect_min_x_len": 200, "rect_min_y_len": 50, "rect_x_pos":None, "rect_y_pos":None, "rect_x_len":None, "rect_y_len":None})
 
     def post_init(self):
         PlantumlType._instance_count += 1  # Increment the counter
@@ -231,7 +240,18 @@ class PlantumlType:
 
         return activities_list
 
-class PlantumlGroup(PlantumlType):
+class PlantumlContainer(PlantumlType):
+    """
+    Parent class for all class that may contain other PlantumlType inside, a container.
+    See base class PlantumlType for more.
+    """
+    def __init__(self, name="", **options):
+        super().__init__(name)
+        self.type = "container"
+        self.metadata_dict.update(options)
+        # super().__post_init__()
+
+class PlantumlGroup(PlantumlContainer):
     """
     This class defines a PlantUML architectural 'together' to group components without any visible box.
     See base class PlantumlType for more.
@@ -242,7 +262,7 @@ class PlantumlGroup(PlantumlType):
         self.metadata_dict.update(options)
         # super().__post_init__()
 
-class PlantumlActor(PlantumlType):
+class PlantumlActor(PlantumlContainer):
     """
     This class defines a PlantUML architectural Actor.
     See base class PlantumlType for more.
@@ -253,7 +273,7 @@ class PlantumlActor(PlantumlType):
         self.metadata_dict.update(options)
         # super().__post_init__()
 
-class PlantumlComponent(PlantumlType):
+class PlantumlComponent(PlantumlContainer):
     """
     This class defines a PlantUML architectural Component.
     See base class PlantumlType for more.
@@ -263,7 +283,7 @@ class PlantumlComponent(PlantumlType):
         self.type = "Component"
         self.metadata_dict.update(options)
 
-class PlantumlFrame(PlantumlType):
+class PlantumlFrame(PlantumlContainer):
     """
     This class defines a PlantUML architectural Frame.
     See base class PlantumlType for more.
@@ -273,7 +293,7 @@ class PlantumlFrame(PlantumlType):
         self.type = "Frame"
         self.metadata_dict.update(options)
 
-class PlantumlFolder(PlantumlType):
+class PlantumlFolder(PlantumlContainer):
     """
     This class defines a PlantUML architectural Folder.
     See base class PlantumlType for more.
@@ -283,7 +303,7 @@ class PlantumlFolder(PlantumlType):
         self.type = "Folder"
         self.metadata_dict.update(options)
 
-class PlantumlDatabase(PlantumlType):
+class PlantumlDatabase(PlantumlContainer):
     """
     This class defines a PlantUML architectural Database.
     See base class PlantumlType for more.
@@ -293,7 +313,7 @@ class PlantumlDatabase(PlantumlType):
         self.type = "Database"
         self.metadata_dict.update(options)
 
-class PlantumlPackage(PlantumlType):
+class PlantumlPackage(PlantumlContainer):
     """
     This class defines a PlantUML architectural Package.
     See base class PlantumlType for more.
@@ -313,15 +333,15 @@ class PlantumlInterface(PlantumlType):
         self.type = "Interface"
         self.metadata_dict.update(options)
 
-class PlantumlPort(PlantumlType):
-    """
-    This class defines a PlantUML architectural Port.
-    See base class PlantumlType for more.
-    """
-    def __init__(self, name="", **options):
-        super().__init__(name)
-        self.type = "Port"
-        self.metadata_dict.update(options)
+# class PlantumlPort(PlantumlType):
+    # """
+    # This class defines a PlantUML architectural Port.
+    # See base class PlantumlType for more.
+    # """
+    # def __init__(self, name="", **options):
+        # super().__init__(name)
+        # self.type = "Port"
+        # self.metadata_dict.update(options)
 
 class PlantumlActivity(PlantumlType):
     """
@@ -346,7 +366,7 @@ class PlantumlActivity(PlantumlType):
         await asyncio.sleep(0)  # Simulating an asynchronous operation
         # print(f"Async call completed for {self.name}!")    
 
-class PlantumlArchitecture(PlantumlType):
+class PlantumlArchitecture(PlantumlContainer):
     """
     This class defines a PlantUML Architecture.
     This class defines the 'skinparam' attribute for all components (plantuml syntax). It can be replaced using parma skinparam="..."
@@ -417,20 +437,46 @@ skinparam linetype ortho
     def arch_post_init(self):
         # print("    arch_post_init(self):", self.name)
         self._recursive_post_init(self)
+        self._connect_arch_items()
         self.do_layout_combinations()
 
+    def _connect_arch_items(self):
+        # Connects all compones to the previous one horizontally, till a ArchBreakLine is found
+        # Initialize the previous key-value pair
+        self.layout_combine_horizontal = []
+        self.layout_combine_vertical = []
+        prev_value = None
+        first_row_value = None
+        previous_first_row_value = None
+        for value in self.__dict__.values():
+            if isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection) and not isinstance(value, PlantumlGroup):
+                if first_row_value is None:
+                    first_row_value = value 
+                    if previous_first_row_value is not None:
+                        self.layout_combine_vertical.append((previous_first_row_value, first_row_value))
+                        previous_first_row_value = None
+                if prev_value is not None:
+                    self.layout_combine_horizontal.append((prev_value, value))
+                    # Update previous value pair
+                prev_value = value
+            elif isinstance(value, ArchBreakLine):
+                # Starts again new line
+                prev_value = None
+                previous_first_row_value = first_row_value
+                first_row_value = None
+    
     def do_layout_combinations(self):
         # Create some invisible plantuml connections to try to fix components in relative positions
         self.metadata_dict["layout_connectors"] = []
         if hasattr(self, 'layout_combine_vertical'):
             for item in self.layout_combine_vertical:
                 # Store a tuple
-                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[hidden]d-", ObjectRef(item[1])))
+                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[#red]d-", ObjectRef(item[1])))
                 # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]d- {item[1].path}")
         if hasattr(self, 'layout_combine_horizontal'):
-            for item in self.layout_combine_vertical:
+            for item in self.layout_combine_horizontal:
                 # Store a tuple
-                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[hidden]r-", ObjectRef(item[1])))
+                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[#blue]r-", ObjectRef(item[1])))
                 # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]r- {item[1].path}")
 
 class PlantumlConnection(PlantumlType):

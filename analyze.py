@@ -6,9 +6,12 @@ from plantuml.plantuml_activity import do_plantuml_activity
 from plantuml.plantuml_sequence import do_plantuml_sequence
 from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_object
 from plantuml.redirect_output_to_file import redirect_output_to_file
-from plantuml.generate_plantuml_html import redirect_output_to_html
-from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlPort, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup
+from plantuml.generate_plantuml_html import redirect_plantuml_output_to_html
+from plantuml.generate_svg_html import redirect_svg_output_to_html
+from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup, ArchBreakLine
 from plantuml.plantuml_simulation import PlantumlSimulation
+
+from plantuml.svg_architecture import do_svg_architecture
 
 # Exemplo 1 -------------------------------------------------------------------
 def example_function(x, a=1, *args, **kwargs):
@@ -205,6 +208,8 @@ It can also be simulated.
         self.component1 = MyComponent1("Mycomponent 1")
         self.component2 = MyComponent2("Mycomponent 2", color="pink;line:red;line.bold;text:red")
 
+        self.brk1 = ArchBreakLine()
+
         self.component3 = PlantumlComponent("Mycomponent 3")
         self.component4 = PlantumlComponent()
         self.component5 = PlantumlComponent()
@@ -213,9 +218,11 @@ It can also be simulated.
         self.component6 = PlantumlComponent("PlantumlComponent 6")
         self.component6.state_activity = PlantumlActivity("State Machine")
         self.component6.state_activity.state_conn_1 = None
+        self.component6.state_activity2 = PlantumlActivity("This is a very long name to fit inside a component with some reduced size, just to see how it works", note=r"This is a note\nfor an ver long activity")
         self.component6.state_activity.replace_run_method(state_machine_run)
         
-        self.layout_combine_vertical = [(self.component2, self.component6)]
+        # # Create some invisible plantuml connections to try to fix components in relative positions
+        # self.layout_combine_vertical = [(self.component2, self.component6)]
         
         self.component1.subcomp.activity2.replace_run_method(subactivity_2_run)
         self.class_activity.replace_run_method(sm_send_run)
@@ -239,42 +246,51 @@ It can also be simulated.
     def __init__(self, name):
         self.frame = PlantumlFrame("My Frame")
         self.frame.sub_architecture = MyArchitecture("my architecture")
-        
-        self.group1 = PlantumlGroup()
-        self.group1.component_super_arch2 = MyComponent2("Mycomponent_super_arch 2", color="pink;line:red;line.bold;text:red")
-        self.group1.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
-        self.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3")
-        self.conn4 = PlantumlConnection("Conn 4", self.group1.component_super_arch1, self.group1.component_super_arch2)
 
-        # Create some invisible plantuml connections to try to fix components in relative positions
-        #self.layout_combine_vertical = [(self.component_super_arch1, self.frame.sub_architecture.component1)]
-        self.layout_combine_vertical = [(self.group1.component_super_arch1, self.frame), (self.frame, self.group1.component_super_arch2)]
+        self.brk1 = ArchBreakLine()
+        
+        # self.group1 = PlantumlGroup()
+        self.frame2 = PlantumlFrame("My Frame 2")
+        self.frame2.component_super_arch2 = MyComponent2("Mycomponent_super_arch 2", color="pink;line:red;line.bold;text:red")
+        self.frame2.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
+        self.frame2.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3")
+        self.conn4 = PlantumlConnection("Conn 4", self.frame2.component_super_arch1, self.frame2.component_super_arch2)
+
+        # # Create some invisible plantuml connections to try to fix components in relative positions
+        # self.layout_combine_vertical = [(self.group1.component_super_arch1, self.frame), (self.frame, self.group1.component_super_arch2)]
         
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
 myarch = MySuperArchitecture("my super architecture")
 # myarch.arch_post_init()
 
-@redirect_output_to_html('output/myarch.html', "Architecture test", myarch.description)
+
+@redirect_plantuml_output_to_html('output/myarch.html', "Architecture test", myarch.description)
 def case3(myarch):
     # Example with do_plantuml_architecture
     do_plantuml_architecture(myarch)
 
-@redirect_output_to_html('output/myarcview.html', "ArchitectureView test")
+@redirect_plantuml_output_to_html('output/myarcview.html', "ArchitectureView test")
 def case4(myarch):
     # Example with do_plantuml_architecture
     do_plantuml_architecture(myarch)
 
-@redirect_output_to_html('output/mysimul.html', "Architecture Simulation test", "First simulation attempt")
+@redirect_plantuml_output_to_html('output/mysimul.html', "Architecture Simulation test", "First simulation attempt")
 def case5(mysim):
     # Example with PlantumlArchitecture simulate
     mysim.simulate()
 
-@redirect_output_to_html('output/mysimul2.html', "Architecture Simulation test 2", "Second simulation, to test repetition")
+@redirect_plantuml_output_to_html('output/mysimul2.html', "Architecture Simulation test 2", "Second simulation, to test repetition")
 def case6(mysim):
     # Example with PlantumlArchitecture simulate
     mysim.simulate()
 
+@redirect_svg_output_to_html('output/svg_arch.html', "Architecture Simulation with SVG", "This is the description of this SVG simulation<br> It may contain multiple lines")
+def case7(myarch):
+    # Example with PlantumlArchitecture simulate
+    do_svg_architecture(myarch)
+ 
+case7(myarch) 
 # introspect_object(myarch)
 
 

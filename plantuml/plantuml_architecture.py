@@ -41,8 +41,8 @@ def print_plant_component(name, plantuml_obj, indent=0):
         print_with_indent(f"{plantuml_obj.type} \"{name}\" as {path} ${path} {color}{extra}", indent)
     elif isinstance(plantuml_obj, pt.PlantumlInterface):
         print_with_indent(f"interface \"{name}\" as {path} ${path} {color}", indent)
-    elif isinstance(plantuml_obj, pt.PlantumlPort):
-        print_with_indent(f"port \"{name}\" as {path} ${path} {color}", indent)
+    # elif isinstance(plantuml_obj, pt.PlantumlPort):
+        # print_with_indent(f"port \"{name}\" as {path} ${path} {color}", indent)
     elif isinstance(plantuml_obj, pt.PlantumlActivity):
         print_with_indent(f"agent \"{name}\" as {path} ${path} {color}", indent)
 
@@ -130,13 +130,13 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
         plantuml_arch -- A class of a PlantumlType type.
         kwargs -- Optional key/value arguments.
     """
-    def introspect(obj, connections, indent):
+    def recurrent(obj, connections, indent):
         path = ""
         
         # First add the layout_connectors to the connections dictionary
         if isinstance(obj, pt.PlantumlArchitecture) and "layout_connectors" in obj.metadata_dict:
             for value in obj.metadata_dict["layout_connectors"]:
-                str = f"{value[0].ref.path} {value[1]} {value[2].ref.path}"
+                str = f"  {value[0].ref.path} {value[1]} {value[2].ref.path}"
                 connections.update({str:str})
         for name, value in inspect.getmembers(obj):
             if not inspect.isroutine(value) and not name.startswith('__'):
@@ -150,7 +150,7 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
                         print_plant_component(value.name, value, indent)
 
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection):# and is_container(value):
-                    introspect(value, connections, indent+1)
+                    recurrent(value, connections, indent+1)
                 if isinstance(value, pt.PlantumlComponent) or\
                     isinstance(value, pt.PlantumlGroup) or \
                     isinstance(value, pt.PlantumlActor) or \
@@ -177,7 +177,7 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
         print(plantuml_arch.metadata_dict["orientation"])
     if "skinparam" in plantuml_arch.metadata_dict:
         print(plantuml_arch.metadata_dict["skinparam"])
-    introspect(plantuml_arch, connections, 0)
+    recurrent(plantuml_arch, connections, 0)
     
     # print all connections only in the end.
     for value in connections.values():

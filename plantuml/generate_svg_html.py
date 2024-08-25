@@ -13,9 +13,9 @@ def escape_html(text: str) -> str:
     text = text.replace("'", "&#39;")
     return text
     
-def redirect_plantuml_output_to_html(file_name, title="PlantUML", description="To be defined."):
+def redirect_svg_output_to_html(file_name, title="SVG Example", description="To be defined."):
     """
-    This ia a decorator to create a HTML file using a PlanUML model.
+    This ia a decorator to create a HTML using the SVG model instead of plantuml.
     file_name: The output HTML file.
     title: A title to the HTML file.
     description: A description to the HTML file. It can use HTML tags.
@@ -30,7 +30,7 @@ def redirect_plantuml_output_to_html(file_name, title="PlantUML", description="T
 
             try:
                 res = func(*args, **kwargs)
-                generate_html_with_plantuml(new_stdout.getvalue(), file_name, title, description)
+                generate_html_with_svg(new_stdout.getvalue(), file_name, title, description)
             finally:
                 # Reset stdout
                 sys.stdout = old_stdout
@@ -39,22 +39,18 @@ def redirect_plantuml_output_to_html(file_name, title="PlantUML", description="T
     return decorator
 
 
-@redirect_plantuml_output_to_html('output/output1.html', "Test title.")
-def generate_plantuml_script():
-    """Function that generates and prints PlantUML script."""
-    print("""
-@startuml
-Alice -> Bob: Authentication Request
-Bob --> Alice: Authentication Response
-@enduml
-""")
+# @redirect_svg_output_to_html('output/output1.html', "Test title.")
+# def generate_plantuml_script():
+    # """Function that generates and prints PlantUML script."""
+    # print("""
+# @startuml
+# Alice -> Bob: Authentication Request
+# Bob --> Alice: Authentication Response
+# @enduml
+# """)
 
-def generate_html_with_plantuml(plantuml_script, output_path = "output.html", title="", description=""):
-    """Generate HTML with embedded PlantUML diagram and original script."""
-    encoded_script = deflate_and_encode(plantuml_script)
-    print("encoded_script = ", encoded_script)
-    img_url = f"http://www.plantuml.com/plantuml/png/{encoded_script}"
-    print("img_url = ", img_url)
+def generate_html_with_svg(svg_script, output_path = "output.html", title="", description=""):
+    """Generate HTML with embedded SVG diagram and original script."""
 
     template_str = r"""
     <!DOCTYPE html>
@@ -112,10 +108,10 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
     <body>
         <h1>{{ title }}</h1>
         <h2>Diagram</h2>
-        <img src="{{ img_url }}" alt="PlantUML Diagram">
+{{ svg_script }}
         <details>
-            <summary>Show/Hide PlantUML Code</summary>
-                <pre><code class="language-plantuml">{{ plantuml_script }}</code></pre>
+            <summary>Show/Hide SVG Code</summary>
+                <pre><code class="language-svg">{{ html_svg_script }}</code></pre>
         </details>    
         <h2>Description</h2>
         {{ description }}
@@ -136,7 +132,7 @@ def generate_html_with_plantuml(plantuml_script, output_path = "output.html", ti
     """
 
     template = jinja2.Template(template_str)
-    html_output = template.render(img_url=img_url, plantuml_script=escape_html(plantuml_script), title=title, description=description)
+    html_output = template.render(svg_script=svg_script, html_svg_script=escape_html(svg_script), title=title, description=description)
 
     #output_path = "output.html"
     with open(output_path, "w") as f:

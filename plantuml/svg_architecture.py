@@ -4,6 +4,7 @@ import tokenize
 import io
 from pprint import pprint
 import plantuml.plantuml_types as pt
+import plantuml.connection_routing as cr
 import inspect
 import math
 
@@ -41,6 +42,21 @@ def get_absolute_center(arch, obj):
     
     abs_x += (get_obj_prop(obj, 'rect_x_pos')+get_obj_prop(obj, 'rect_x_len')/2)
     abs_y += (get_obj_prop(obj, 'rect_y_pos')+get_obj_prop(obj, 'rect_y_len')/2)
+    return abs_x, abs_y
+
+def get_absolute_pos(arch, obj):
+
+    owner_tree = arch.get_owner_tree(obj)
+    abs_x = 0
+    abs_y = 0
+    for index, item in enumerate(owner_tree):
+        
+        # print_html_comment_indent(f"{index}: {item.name}, pos=({get_obj_prop(item, 'rect_x_pos', 0)},{get_obj_prop(item, 'rect_y_pos', 0)})", 2)
+        abs_x += get_obj_prop(item, 'rect_x_pos')
+        abs_y += get_obj_prop(item, 'rect_y_pos')
+    
+    abs_x += get_obj_prop(obj, 'rect_x_pos')
+    abs_y += get_obj_prop(obj, 'rect_y_pos')
     return abs_x, abs_y
 
 def calculate_icon_space(obj, style):
@@ -105,7 +121,157 @@ def print_svg_comment(text_lines, x, y, width, height, line_to_x, line_to_y, tit
         for index, line in enumerate(text_lines):
             print_with_indent(f'<text x="{x+5}" y="{y+20+(title_font_size*index)}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{line}</text>', indent)
 
+def draw_single_connection(name, pos1, pos2, style, indent=0):
+    return f'<line x1="{pos1[0]}" y1="{pos1[1]}" x2="{pos2[0]}" y2="{pos2[1]}" stroke="{style["color"]}" stroke-width="1" />'
 
+def predict_single_connection(arch, obj1, obj2):
+    def normalize_vector(v):
+        magnitude = math.sqrt(v[0]**2 + v[1]**2)
+        if magnitude == 0:
+            return (0, 0)
+        return (v[0] / magnitude, v[1] / magnitude)
+
+    if not isinstance(obj1, pt.PlantumlType) or not isinstance(obj2, pt.PlantumlType):
+        return (0, 0)
+    x1, y1 = get_absolute_center(arch, obj1)
+    x2, y2 = get_absolute_center(arch, obj2)
+    
+    return normalize_vector((x2-x1, y2-y1))
+
+def calc_bord_pos(arch, obj, comp1_vec):
+    print_html_comment_indent(f"  calc_bord_pos obj name = {obj.name}")
+    
+    x, y = get_absolute_pos(arch, obj)
+    # x = obj.metadata_dict["rect_x_pos"]
+    # y = obj.metadata_dict["rect_y_pos"]
+    width = obj.metadata_dict["rect_x_len"]
+    height = obj.metadata_dict["rect_y_len"]
+    
+    res = cr.find_rect_border_intersection(x, y, width, height, comp1_vec[0], comp1_vec[1])
+    print_html_comment_indent(f"   calc_bord_pos res = {res}")
+    return res
+
+def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
+    def is_hexadecimal(s):
+        # Return True if the string represents a hexa value
+        try:
+            print ("OK")
+            int(s, 16)
+            return True
+        except ValueError:
+            print ("EXCEPTION")
+            return False
+    def invert_vec(v):
+        # Invert the signal of the items of the vector
+        x = -v[0]
+        y = -v[1]
+        return (x,y)
+    def average_vec(vec_list):
+        # Return a vector (normalized) representing the average of the list of vectors
+        x = 0
+        y = 0
+        for idx, v in enumerate(vec_list):
+            print_html_comment_indent(f"   average_vec ({v[0]}, {v[1]})")
+            x += v[0]
+            y += v[1]
+        
+        magnitude = math.sqrt(x**2 + y**2)
+        if magnitude == 0:
+            return (0, 0)
+        print_html_comment_indent(f"   average_vec ret ({x / magnitude}, {y / magnitude})")
+        return (x / magnitude, y / magnitude)
+        
+    style = {"color":"black"} # Provision for ... TBD
+    # color = ""
+    if "color" in plantuml_obj.metadata_dict:
+        color_str = plantuml_obj.metadata_dict["color"]
+        if is_hexadecimal(color_str):
+            style["color"] = "#"+color_str
+        else:
+            style["color"] = color_str
+    
+    # line = "-[norank]-"
+    # if "line" in plantuml_obj.metadata_dict:
+        # line = plantuml_obj.metadata_dict["line"]
+    # elif plantuml_obj.metadata_dict["direction"] == "out":
+        # line = "-[norank]->"
+    # elif plantuml_obj.metadata_dict["direction"] == "in":
+        # line = "<-[norank]-"
+
+    # First create an approximation of direction by getting the average of the multiple center-2-center lines
+    comp1_vec = []
+    comp2_vec = []
+    if isinstance(plantuml_obj.comp1, list):
+        print_html_comment_indent(f"Case 1 (multiples to one)")
+        comp2 = plantuml_obj.comp2.ref
+        for item in plantuml_obj.comp1:
+            comp1 = item.ref
+            # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
+            comp1_vec.append(predict_single_connection(arch, comp1, comp2))
+        print_html_comment_indent(f"   comp1_vec {comp1_vec}")
+        comp2_vec.append(invert_vec(average_vec(comp1_vec)))
+        print_html_comment_indent(f"   comp1_vec = {comp1_vec} comp2_vec = {comp2_vec[0]}")
+    elif isinstance(plantuml_obj.comp2, list):
+        # print_html_comment_indent(f"Case 2 (one to multiples)")
+        comp1 = plantuml_obj.comp1.ref
+        for item in plantuml_obj.comp2:
+            comp2 = item.ref
+            # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
+            comp2_vec.append(invert_vec(predict_single_connection(arch, comp1, comp2)))
+            # print_html_comment_indent(f"   before comp1_vec {predict_single_connection(arch, comp1, comp2)}")
+        comp1_vec.append(invert_vec(average_vec(comp2_vec))) # Invert again because 1 should use 2 not inverted
+        # print_html_comment_indent(f"   comp1_vec = {comp1_vec[0]} comp2_vec = {comp2_vec}")
+    else:
+        # print_html_comment_indent(f"Case 3 (one to one)")
+        comp2 = plantuml_obj.comp1.ref
+        comp1 = plantuml_obj.comp2.ref
+        # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
+        comp1_vec.append(predict_single_connection(arch, comp1, comp2))
+        comp2_vec.append(invert_vec(comp1_vec[0]))
+        # print_html_comment_indent(f"  case 3 {comp1.name} vec1=({comp1_vec[0][0]},{comp1_vec[0][1]}); {comp2.name} vec2=({comp2_vec[0][0]},{comp2_vec[0][1]})")
+
+    conn_str = ""
+    if isinstance(plantuml_obj.comp1, list):
+        # print_html_comment_indent(f"Case 1")
+        comp2 = plantuml_obj.comp2.ref
+        pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
+        for index, item in enumerate(plantuml_obj.comp1):
+            comp1 = item.ref
+            pos1 = calc_bord_pos(arch, comp1, comp1_vec[index])
+            conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
+        
+    elif isinstance(plantuml_obj.comp2, list):
+        comp1 = plantuml_obj.comp1.ref
+        pos1 = calc_bord_pos(arch, comp1, comp1_vec[0])
+        for index, item in enumerate(plantuml_obj.comp2):
+            # print(f" Case 2 {index}")
+            comp2 = item.ref
+            pos2 = calc_bord_pos(arch, comp2, comp2_vec[index])
+            conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
+    else:
+        # print_html_comment_indent(f"Case 3")
+        comp1 = plantuml_obj.comp2.ref
+        comp2 = plantuml_obj.comp1.ref
+        pos1 = calc_bord_pos(arch, comp1, comp1_vec[0])
+        pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
+        conn_str = draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}"
+    return {name:conn_str}
+
+def get_all_connections(arch, connections):
+    
+    def get_all_connections_recurrent(arch, obj, connections):
+        if isinstance(obj, pt.PlantumlContainer):
+           for name, value in inspect.getmembers(obj):
+                if isinstance(value, pt.PlantumlConnection):
+                    if value.metadata_dict['hide'] == False and value.metadata_dict['remove'] == False:
+                        # Add this connection to the connections dictionary
+                        connections.update(create_svg_comonnection(arch, value.name, value))
+
+                elif isinstance(value, pt.PlantumlType):
+                    get_all_connections_recurrent(arch, value, connections)
+    
+    get_all_connections_recurrent(arch, arch, connections)
+    
 def get_all_comments(obj, comments):
 
     if isinstance(obj, pt.PlantumlType):
@@ -227,7 +393,7 @@ def print_svg_component(name, obj, indent=0):
         print_with_indent(f'<text x="{x+50}" y="{y+25}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{name}</text>', indent)
         
     else:
-        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" style="fill: none; stroke: black; stroke-width: 2px;" stroke-dasharray="2, 2"/>', indent)
+        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" style="fill: none; stroke: black; stroke-width: 1px;" stroke-dasharray="2, 2"/>', indent)
         print_with_indent(f'<text x="{x+5}" y="{y+20}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{name}</text>', indent)
 
 def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
@@ -354,8 +520,10 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     top_comments, bottom_comments = split_top_bottom_comments(plantuml_arch, comments, plantuml_arch.metadata_dict["rect_x_len"], plantuml_arch.metadata_dict["rect_y_len"])
     top_comment_width, top_comment_height = calculate_comments_dim(top_comments)
     bottom_comment_width, bottom_comment_height = calculate_comments_dim(bottom_comments)
-    # top_comment_height += 20
-    # bottom_comment_height += 20
+
+    connections = {} # Use dictionary to avoid duplications
+    get_all_connections(plantuml_arch, connections)
+
     
     svg_height = plantuml_arch.metadata_dict["rect_y_len"] + top_comment_height + bottom_comment_height
     svg_width = max(plantuml_arch.metadata_dict["rect_x_len"], top_comment_width, bottom_comment_width)
@@ -387,6 +555,11 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
 
     print_with_indent(f'<g transform="translate(0, {top_comment_height})">', 2)
     recurrent(plantuml_arch, connections, 3)
+
+    # print all connections only in the end.
+    for value in connections.values():
+        print(value)
+
     print_with_indent("</g>", 2)
 
     for comment in top_comments:

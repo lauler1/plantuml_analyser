@@ -382,7 +382,7 @@ class PlantumlArchitecture(PlantumlContainer):
     def __init__(self, name="", **options):
         super().__init__(name)
         self.type = "Architecture"
-        self.metadata_dict["layout_connectors"] = []
+        self.metadata_dict["layout_connectors"] = [] # Connections used to force placing components next other
         # self.metadata_dict["orientation"] = "left to right direction"
         self.metadata_dict["orientation"] = "top to bottom direction"
         self.metadata_dict["skinparam"] = """

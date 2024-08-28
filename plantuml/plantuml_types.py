@@ -76,6 +76,29 @@ class PlantumlType:
         # print("---->", get_variable_names(self, globals()))
         self.metadata_dict.update({"rect_min_x_len": 200, "rect_min_y_len": 50, "rect_x_pos":None, "rect_y_pos":None, "rect_x_len":None, "rect_y_len":None})
 
+    def __str__(self):
+        return f"'{self.path}'"
+
+    def __repr__(self):
+        return f"'{self.path}'"
+
+    def is_visible(self):
+        if self.metadata_dict['hide'] == True or self.metadata_dict['remove'] == True:
+            return False
+        return True
+
+    def is_visible_recursive(self, arch):
+        if self.metadata_dict['hide'] == True or self.metadata_dict['remove'] == True:
+            return False
+
+        owner_tree = arch.get_owner_tree(self)
+        # print("is_visible_recursive ", owner_tree)
+        for item in owner_tree:
+            if item.is_visible() == False:
+                return False
+
+        return True
+    
     def post_init(self):
         PlantumlType._instance_count += 1  # Increment the counter
         self.instance_count = PlantumlType._instance_count
@@ -383,8 +406,8 @@ class PlantumlArchitecture(PlantumlContainer):
         super().__init__(name)
         self.type = "Architecture"
         self.metadata_dict["layout_connectors"] = [] # Connections used to force placing components next other
-        # self.metadata_dict["orientation"] = "left to right direction"
-        self.metadata_dict["orientation"] = "top to bottom direction"
+        self.metadata_dict["orientation"] = "left to right direction"
+        #self.metadata_dict["orientation"] = "top to bottom direction"
         self.metadata_dict["skinparam"] = """
 skinparam note{
   BackgroundColor #FFFFCB

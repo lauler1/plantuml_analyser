@@ -21,49 +21,11 @@ def print_with_indent(text, indent = 0):
     
 def print_html_comment_indent(text, indent = 0):
     print('    ' * indent + "<!--", text, "-->")
-    
-def get_obj_prop(obj, prop, default=0):
-    if isinstance(obj, pt.PlantumlType) and prop in obj.metadata_dict:
-        res = obj.metadata_dict[prop]
-        if res is not None:
-            return res
-    return default
-
-def get_absolute_center(arch, obj):
-
-    owner_tree = arch.get_owner_tree(obj)
-    abs_x = 0
-    abs_y = 0
-    for index, item in enumerate(owner_tree):
-        
-        # print_html_comment_indent(f"{index}: {item.name}, pos=({get_obj_prop(item, 'rect_x_pos', 0)},{get_obj_prop(item, 'rect_y_pos', 0)})", 2)
-        abs_x += get_obj_prop(item, 'rect_x_pos')
-        abs_y += get_obj_prop(item, 'rect_y_pos')
-    
-    abs_x += (get_obj_prop(obj, 'rect_x_pos')+get_obj_prop(obj, 'rect_x_len')/2)
-    abs_y += (get_obj_prop(obj, 'rect_y_pos')+get_obj_prop(obj, 'rect_y_len')/2)
-    return abs_x, abs_y
-
-def get_absolute_pos(arch, obj):
-
-    owner_tree = arch.get_owner_tree(obj)
-    abs_x = 0
-    abs_y = 0
-    for index, item in enumerate(owner_tree):
-        
-        # print_html_comment_indent(f"{index}: {item.name}, pos=({get_obj_prop(item, 'rect_x_pos', 0)},{get_obj_prop(item, 'rect_y_pos', 0)})", 2)
-        abs_x += get_obj_prop(item, 'rect_x_pos')
-        abs_y += get_obj_prop(item, 'rect_y_pos')
-    
-    abs_x += get_obj_prop(obj, 'rect_x_pos')
-    abs_y += get_obj_prop(obj, 'rect_y_pos')
-    return abs_x, abs_y
 
 def calculate_icon_space(obj, style):
     return 50 # TODO: Improve this
 
 def calculate_text_dim(text, font_size=15, font_weight="normal"):
-
     num_chars = len(text)
     char_height = font_size
     char_width = 0.6 * font_size
@@ -133,15 +95,15 @@ def predict_single_connection(arch, obj1, obj2):
 
     if not isinstance(obj1, pt.PlantumlType) or not isinstance(obj2, pt.PlantumlType):
         return (0, 0)
-    x1, y1 = get_absolute_center(arch, obj1)
-    x2, y2 = get_absolute_center(arch, obj2)
+    x1, y1 = cr.get_absolute_center(arch, obj1)
+    x2, y2 = cr.get_absolute_center(arch, obj2)
     
     return normalize_vector((x2-x1, y2-y1))
 
 def calc_bord_pos(arch, obj, comp1_vec):
     print_html_comment_indent(f"  calc_bord_pos obj name = {obj.name}")
     
-    x, y = get_absolute_pos(arch, obj)
+    x, y = cr.get_absolute_pos(arch, obj)
     # x = obj.metadata_dict["rect_x_pos"]
     # y = obj.metadata_dict["rect_y_pos"]
     width = obj.metadata_dict["rect_x_len"]
@@ -237,8 +199,9 @@ def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
         pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
         for index, item in enumerate(plantuml_obj.comp1):
             comp1 = item.ref
-            pos1 = calc_bord_pos(arch, comp1, comp1_vec[index])
-            conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
+            if comp1.is_visible_recursive(arch) and comp2.is_visible_recursive(arch):
+                pos1 = calc_bord_pos(arch, comp1, comp1_vec[index])
+                conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
         
     elif isinstance(plantuml_obj.comp2, list):
         comp1 = plantuml_obj.comp1.ref
@@ -246,15 +209,17 @@ def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
         for index, item in enumerate(plantuml_obj.comp2):
             # print(f" Case 2 {index}")
             comp2 = item.ref
-            pos2 = calc_bord_pos(arch, comp2, comp2_vec[index])
-            conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
+            if comp1.is_visible_recursive(arch) and comp2.is_visible_recursive(arch):
+                pos2 = calc_bord_pos(arch, comp2, comp2_vec[index])
+                conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
     else:
         # print_html_comment_indent(f"Case 3")
         comp1 = plantuml_obj.comp2.ref
         comp2 = plantuml_obj.comp1.ref
-        pos1 = calc_bord_pos(arch, comp1, comp1_vec[0])
-        pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
-        conn_str = draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}"
+        if comp1.is_visible_recursive(arch) and comp2.is_visible_recursive(arch):
+            pos1 = calc_bord_pos(arch, comp1, comp1_vec[0])
+            pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
+            conn_str = draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}"
     return {name:conn_str}
 
 def get_all_connections(arch, connections):
@@ -263,7 +228,7 @@ def get_all_connections(arch, connections):
         if isinstance(obj, pt.PlantumlContainer):
            for name, value in inspect.getmembers(obj):
                 if isinstance(value, pt.PlantumlConnection):
-                    if value.metadata_dict['hide'] == False and value.metadata_dict['remove'] == False:
+                    if value.is_visible():
                         # Add this connection to the connections dictionary
                         connections.update(create_svg_comonnection(arch, value.name, value))
 
@@ -274,10 +239,9 @@ def get_all_connections(arch, connections):
     
 def get_all_comments(obj, comments):
 
-    if isinstance(obj, pt.PlantumlType):
+    if isinstance(obj, pt.PlantumlType) and obj.is_visible():
         if "note" in obj.metadata_dict:
             lines, width, height = calculate_note_dim(obj.metadata_dict["note"])
-            
             comments.append([lines, obj, width, height])
         for name, value in inspect.getmembers(obj):
             if isinstance(value, pt.PlantumlType):
@@ -296,7 +260,7 @@ def split_top_bottom_comments(arch, comments, right_end, height, margin=50):
 
     # Split the list of comments to the closest list on vertical axis, _top_comments or _bottom_comments
     for comment in comments:
-        x, y = get_absolute_center(arch, comment[1])
+        x, y = cr.get_absolute_center(arch, comment[1])
         
         # Add center position of the related component, pos 4, 5
         comment += ([x, y])
@@ -410,9 +374,14 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     """
     # rect_min_x_len": 400, "rect_min_y_len": 200, "rect_x_pos":None, "rect_y_pos":None, "rect_x_len":None, "rect_y_len":None
     def recurrent_dim(obj, style, indent=0):
-        # Creates the layout retangles of the architecture
+        # Creates the layout retangles of the architecture.
+        # All coordinates are relative to the parent component. To get an absolute coordinates use get_absolute_pos or get_absolute_center from plantuml.connection_routing.
+        
+        #self.metadata_dict["orientation"] = "left to right direction"
+        #self.metadata_dict["orientation"] = "top to bottom direction"
+        
         #{"margin":20, "padding":20, "title-height": 50}
-        if (isinstance(obj, pt.PlantumlType) or isinstance(obj, pt.ArchBreakLine))and not isinstance(obj, pt.PlantumlConnection):
+        if (isinstance(obj, pt.PlantumlType) or isinstance(obj, pt.ArchBreakLine))and not isinstance(obj, pt.PlantumlConnection) and obj.metadata_dict['remove'] == False:
         
             # print_with_indent(f">>  {obj.name}: min dim=({obj.metadata_dict['rect_min_x_len']}, {obj.metadata_dict['rect_min_y_len']})", indent)
             list_of_obj = inspect.getmembers(obj)
@@ -431,9 +400,9 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                         continue
                     recurrent_dim(child, style, indent+1)
                 
-                margin = get_obj_prop(obj, 'margin', style['margin'])
-                padding = get_obj_prop(obj, 'padding', style['padding'])
-                title_height = get_obj_prop(obj, 'title-height', style['title-height'])
+                margin = cr.get_obj_prop(obj, 'margin', style['margin'])
+                padding = cr.get_obj_prop(obj, 'padding', style['padding'])
+                title_height = cr.get_obj_prop(obj, 'title-height', style['title-height'])
                 
                 current_x = margin + padding
                 current_y = margin + padding + title_height
@@ -498,7 +467,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
         for name, value in inspect.getmembers(obj):
             if not inspect.isroutine(value) and not name.startswith('__'):
 
-                if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection):# and is_container(value):
+                if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection) and value.metadata_dict['hide'] == False:# and is_container(value):
                     print_svg_component(value.name, value, indent)
 
                     # TODO: Consider replace this list by some attribute 'is_container' or isinstance pt.PlantumlContainer
@@ -564,10 +533,10 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
 
     for comment in top_comments:
         print_html_comment_indent(f"top {comment[1].name}: {comment[0]}, center = ({comment[6]},{comment[7]})")
-        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5] + top_comment_height - get_obj_prop(comment[1], 'rect_y_len')/2)
+        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5] + top_comment_height - cr.get_obj_prop(comment[1], 'rect_y_len')/2)
 
     for comment in bottom_comments:
         print_html_comment_indent(f"top {comment[1].name}: {comment[0]}, center = ({comment[6]},{comment[7]})")
-        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5]+ top_comment_height + get_obj_prop(comment[1], 'rect_y_len')/2)
+        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5]+ top_comment_height + cr.get_obj_prop(comment[1], 'rect_y_len')/2)
 
     print(f'    </svg>')

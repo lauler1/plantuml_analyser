@@ -143,7 +143,7 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
                 if isinstance(value, pt.PlantumlType):
                     path = value.path
                     if isinstance(value, pt.PlantumlConnection):
-                        if value.metadata_dict['hide'] == False and value.metadata_dict['remove'] == False:
+                        if value.is_visible():
                             # Add this connection to the connections dictionary
                             connections.update(create_plant_comonnection(value.name, value, indent))
                     else:

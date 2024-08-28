@@ -12,6 +12,7 @@ from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlIn
 from plantuml.plantuml_simulation import PlantumlSimulation
 
 from plantuml.svg_architecture import do_svg_architecture
+import plantuml.connection_routing as cr
 
 # Exemplo 1 -------------------------------------------------------------------
 def example_function(x, a=1, *args, **kwargs):
@@ -289,7 +290,8 @@ def case6(mysim):
 def case7(myarch):
     # Example with PlantumlArchitecture simulate
     do_svg_architecture(myarch)
- 
+
+# myarch.frame.set_options(hide=True) 
 case7(myarch) 
 # introspect_object(myarch)
 
@@ -326,6 +328,7 @@ mysim.set_options(comp_order=[\
 case6(mysim)
 
 
+cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.component_super_arch1.activity2, myarch.frame.sub_architecture.component1.activity1, myarch.frame.sub_architecture.component2.activity1])
 
 # print("\n Old----------------------------------------------------------------------------------------")
 # introspect_object(myarch)

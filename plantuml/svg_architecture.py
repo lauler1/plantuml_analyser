@@ -7,7 +7,12 @@ import plantuml.plantuml_types as pt
 import plantuml.connection_routing as cr
 import inspect
 import math
+from enum import Enum
 
+class Orientation(Enum):
+    LEFT_RIGHT = 0
+    TOP_DOWN = 1
+    
 default_style = { \
          "margin":10, # Separation space outside the rectangle border of a component\
          "padding":10, # Separation space inside the rectangle border of a component\
@@ -373,17 +378,43 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
         kwargs -- Optional key/value arguments.
     """
     # rect_min_x_len": 400, "rect_min_y_len": 200, "rect_x_pos":None, "rect_y_pos":None, "rect_x_len":None, "rect_y_len":None
-    def recurrent_dim(obj, style, indent=0):
+    def recurrent_dim(obj, style, orientation = Orientation.LEFT_RIGHT, indent=0):
         # Creates the layout retangles of the architecture.
         # All coordinates are relative to the parent component. To get an absolute coordinates use get_absolute_pos or get_absolute_center from plantuml.connection_routing.
+        
+        # Preparing  coordination variables for dual orientation inside the subcomponents loop.
+        #   Replacing x and y for u and v.
+        #   Replacing widht and height with len_u and len_v
+        #    current_x -> current_u
+        #    current_y -> current_v
+        #    row_heights -> line_len_us
+        #    max_row_height -> max_line_len_u
+        #    max_width -> max_len_u
+        #    max_height-> max_len_v
         
         #self.metadata_dict["orientation"] = "left to right direction"
         #self.metadata_dict["orientation"] = "top to bottom direction"
         
+        if orientation == Orientation.LEFT_RIGHT:
+            rect_min_u_len = 'rect_min_y_len'
+            rect_min_v_len = 'rect_min_x_len'
+            rect_u_pos = 'rect_y_pos'
+            rect_v_pos = 'rect_x_pos'
+            rect_u_len = 'rect_y_len'
+            rect_v_len = 'rect_x_len'
+        else:
+            rect_min_u_len = 'rect_min_x_len'
+            rect_min_v_len = 'rect_min_y_len'
+            rect_u_pos = 'rect_x_pos'
+            rect_v_pos = 'rect_y_pos'
+            rect_u_len = 'rect_x_len'
+            rect_v_len = 'rect_y_len'
+            
+        
         #{"margin":20, "padding":20, "title-height": 50}
         if (isinstance(obj, pt.PlantumlType) or isinstance(obj, pt.ArchBreakLine))and not isinstance(obj, pt.PlantumlConnection) and obj.metadata_dict['remove'] == False:
         
-            # print_with_indent(f">>  {obj.name}: min dim=({obj.metadata_dict['rect_min_x_len']}, {obj.metadata_dict['rect_min_y_len']})", indent)
+            # print_with_indent(f">>  {obj.name}: min dim=({obj.metadata_dict[rect_min_u_len]}, {obj.metadata_dict[rect_min_v_len]})", indent)
             list_of_obj = inspect.getmembers(obj)
             
             #count how many valid children exists
@@ -398,53 +429,59 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 for key, child in list_of_obj:
                     if not isinstance(child, pt.PlantumlType) or isinstance(child, pt.PlantumlConnection):
                         continue
-                    recurrent_dim(child, style, indent+1)
+                    recurrent_dim(child, style, orientation, indent+1)
                 
                 margin = cr.get_obj_prop(obj, 'margin', style['margin'])
                 padding = cr.get_obj_prop(obj, 'padding', style['padding'])
                 title_height = cr.get_obj_prop(obj, 'title-height', style['title-height'])
                 
-                current_x = margin + padding
-                current_y = margin + padding + title_height
-                row_heights = []
-                max_row_height = 0
+                current_u = margin + padding
+                current_v = margin + padding
+                
+                if orientation == Orientation.LEFT_RIGHT:
+                    current_u += title_height
+                else:
+                    current_v += title_height
+                
+                line_len_us = []
+                max_line_len_u = 0
                 
                 text_with = calculate_text_dim(obj.name, style["title-font-size"])
                 icon_space = calculate_icon_space(obj, style)
                 print_html_comment_indent(f"text_with: {text_with} for {obj.name}")               
-                max_width  = max(obj.metadata_dict['rect_min_x_len'], text_with + icon_space, (2*margin) + (2*padding))
-                max_height = max(obj.metadata_dict['rect_min_y_len'], (2*margin) + (2*padding) + title_height)
+                max_len_u  = max(obj.metadata_dict[rect_min_u_len], text_with + icon_space, (2*margin) + (2*padding))
+                max_len_v = max(obj.metadata_dict[rect_min_v_len], (2*margin) + (2*padding) + title_height)
                 
                 for key, child in obj.__dict__.items(): # Use __dict__ to keep decl order
                     
                     if isinstance(child, pt.ArchBreakLine):
-                        current_x = margin + padding
-                        current_y += (max_row_height + (2*margin))
-                        # print_with_indent(f" ----------------> Break new pos=({current_x}, {current_y})", indent)
-                        row_heights = []
-                        max_row_height = 0
+                        current_u = margin + padding
+                        current_v += (max_line_len_u + (2*margin))
+                        # print_with_indent(f" ----------------> Break new pos=({current_u}, {current_v})", indent)
+                        line_len_us = []
+                        max_line_len_u = 0
                         
                     if not isinstance(child, pt.PlantumlType) or isinstance(child, pt.PlantumlConnection):
                         continue
 
-                    # print_with_indent(f" ----------------> Pos=({current_x}, {current_y}) of {child.name}", indent)
+                    # print_with_indent(f" ----------------> Pos=({current_u}, {current_v}) of {child.name}", indent)
                     # # Set child's position
-                    child.metadata_dict['rect_x_pos'] = current_x
-                    child.metadata_dict['rect_y_pos'] = current_y
-                    row_heights.append(child.metadata_dict['rect_y_len'])
+                    child.metadata_dict[rect_u_pos] = current_u
+                    child.metadata_dict[rect_v_pos] = current_v
+                    line_len_us.append(child.metadata_dict[rect_v_len])
                     
-                    current_x += (child.metadata_dict['rect_x_len'] + (2*margin))
-                    max_row_height = max(row_heights)
+                    current_u += (child.metadata_dict[rect_u_len] + (2*margin))
+                    max_line_len_u = max(line_len_us)
                     
-                    max_width = max(max_width, (current_x + margin + padding))
-                    max_height = max(max_height, (current_y + max_row_height + margin + padding))
+                    max_len_u = max(max_len_u, (current_u + margin + padding))
+                    max_len_v = max(max_len_v, (current_v + max_line_len_u + margin + padding))
                     
 
-                    # print_with_indent(f"  child={child.name} pos=({child.metadata_dict['rect_x_pos']}, {child.metadata_dict['rect_y_pos']})", indent)
+                    # print_with_indent(f"  child={child.name} pos=({child.metadata_dict[rect_u_pos]}, {child.metadata_dict[rect_v_pos]})", indent)
 
                 #temporary
-                obj.metadata_dict['rect_x_len'] = max_width # Contains the inner components + internal margins and paddings
-                obj.metadata_dict['rect_y_len'] = max_height # Contains the inner components + internal margins and paddings
+                obj.metadata_dict[rect_u_len] = max_len_u # Contains the inner components + internal margins and paddings
+                obj.metadata_dict[rect_v_len] = max_len_v # Contains the inner components + internal margins and paddings
                 obj.metadata_dict["title-font-family"] = style["title-font-family"]
                 obj.metadata_dict["title-font-size"] = style["title-font-size"]
 
@@ -454,12 +491,12 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 print_html_comment_indent(f"text_with: {text_with} for {obj.name}")
 
                 # If there are no children, the rectangle keeps its minimal dimensions
-                obj.metadata_dict['rect_x_len'] = max(obj.metadata_dict['rect_min_x_len'], text_with + icon_space)
-                obj.metadata_dict['rect_y_len'] = obj.metadata_dict['rect_min_y_len']
+                obj.metadata_dict["rect_x_len"] = max(obj.metadata_dict["rect_min_x_len"], text_with + icon_space)
+                obj.metadata_dict["rect_y_len"] = obj.metadata_dict["rect_min_y_len"]
                 obj.metadata_dict["title-font-family"] = style["title-font-family"]
                 obj.metadata_dict["title-font-size"] = style["title-font-size"]
                 
-            # print_with_indent(f" {obj.name} dim=({obj.metadata_dict['rect_x_len']},{obj.metadata_dict['rect_y_len']})\n", indent)
+            # print_with_indent(f" {obj.name} dim=({obj.metadata_dict[rect_x_len]},{obj.metadata_dict[rect_y_len]})\n", indent)
 
     def recurrent(obj, connections, indent):
         path = ""
@@ -483,7 +520,14 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
 
     connections = {} # Use dictionary to avoid duplications
     # print("\nSize\n-------------------------------------------------------------------------------\n")
-    recurrent_dim(plantuml_arch, style)
+    
+    orientation = Orientation.LEFT_RIGHT
+    #orientation = Orientation.TOP_DOWN
+    print('plantuml_arch.metadata_dict["orientation"] = ', plantuml_arch.metadata_dict["orientation"])
+    if "orientation" in plantuml_arch.metadata_dict and plantuml_arch.metadata_dict["orientation"] == "top to bottom direction":
+        orientation = Orientation.TOP_DOWN
+        
+    recurrent_dim(plantuml_arch, style, orientation)
     comments = []
     get_all_comments(plantuml_arch, comments)
     top_comments, bottom_comments = split_top_bottom_comments(plantuml_arch, comments, plantuml_arch.metadata_dict["rect_x_len"], plantuml_arch.metadata_dict["rect_y_len"])

@@ -389,23 +389,30 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     This function creates a simple svg layout output representation of the architecture.
     
     This is an alternative to plantuml_architecture using SVG instead. It places the components always in a predictable orientation.
-    
-    
+
     highway_map is a dictionary that is filled by the inner function recurrent_layout_sizing that contains the roads where connections can pass, the addresses of the componnets on the roads and the allocation of connections in the lanes of the road. A road can be main or secundary. Each component may have multiple lanes along the orientation of the component (row or column), the name of the road contains 3 parts separated by space: a charactyer stating if it is a main ('M') or secundary ('S'), the name of the component owning the lane, and an index starting on 0. Secundary roads are placed only in the beginning and at the end of a component to connect main roads. The dictionary has the following structure:
     - roads: Contains the definition and states of all lanes.
         - rects: The screen representation of a lane as a long rectangle.
-        - orientations: the direction of the roads, HORIZONTAL or VERTICAL
+        - orientations: The direction of the roads, HORIZONTAL or VERTICAL.
         - allocations: Used to control the lane state (perpendicular position on a road) where a connection passes through.
     - addresses: Contains all the components with the information what are the lanes passing by and the allocations of the connections around the componnet.
     - final: Just lists all the lanes that are the last one (bottom most or left most) inside a component.
 
     Argumnets:
         plantuml_arch: A class of a PlantumlType type.
-        style: The style dictionary (E.g. pading, colors, fonts) expected for this layout
+        style: The style dictionary (E.g. pading, colors, fonts) expected for this layout.
         kwargs: Optional key/value arguments (TBD).
     """
     
-    highway_map = {"roads": {"rects": {}, "orientations": {}, "allocations": {}}, "addresses": {}, "final": []} # Creates a map of roads and streets for connection routing
+    highway_map = { # Creates a map of roads and streets for connection routing
+    "roads": { # Contains the definition and states of all lanes.
+        "rects": {}, # The screen representation of a lane as a long rectangle.
+        "orientations": {}, # The direction of the roads, HORIZONTAL or VERTICAL.
+        "allocations": {} # Used to control the lane state (perpendicular position on a road) where a connection passes through.
+        },
+    "addresses": {}, # Contains all the components with the information what are the lanes passing by and the allocations of the connections.
+    "final": [] # Just lists all the lanes that are the last one (bottom most or left most) inside a component.
+    }
 
     def recurrent_layout_sizing(obj, orientation = Orientation.LEFT_RIGHT, indent=0):
         # Creates the layout retangles of the architecture.

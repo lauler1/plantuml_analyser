@@ -95,35 +95,35 @@ case1()
 case2()
 
 async def state_machine_run(self, simulation):
-    if self.sm_conn == None:
+    if self.smconn == None:
         # To ensure that this simulation ca run.
         # As the connections are fulfilled by reflection at architecture,
         # not all instances of this class may be connected
         return
         
     simulation.set_simulation_state_decorator(self, "State 1")
-    result = await simulation.wait_message(self.sm_conn)
+    result = await simulation.wait_message(self.smconn)
     simulation.set_simulation_state_decorator(self, f"State 2 {result}")
-    result = await simulation.wait_message(self.sm_conn)
+    result = await simulation.wait_message(self.smconn)
     simulation.set_simulation_state_decorator(self, f"State 3 {result}")
 
 async def subactivity_2_run(self, simulation):
-    if self.multiple_conn == None:
+    if self.multipleconn == None:
         # To ensure that this simulation ca run.
         # As the connections are fulfilled by reflection at architecture,
         # not all instances of this class may be connected
         return
-    result = await simulation.send_message(self.multiple_conn, self, "subactivity_2 message")
+    result = await simulation.send_message(self.multipleconn, self, "subactivity_2 message")
 
 async def sm_send_run(self, simulation):
-    if self.sm_conn == None:
+    if self.smconn == None:
         # To ensure that this simulation ca run.
         # As the connections are fulfilled by reflection at architecture,
         # not all instances of this class may be connected
         return
     await asyncio.sleep(0)
     # await simulation.wait_message(self.sm_conn)
-    result = await simulation.send_message(self.sm_conn, self, "SM message", self.name)
+    result = await simulation.send_message(self.smconn, self, "SM message", self.name)
 
 class MyActivity(PlantumlActivity):
     def __init__(self, name, **options):
@@ -137,13 +137,13 @@ class MySubComponent1(PlantumlComponent):
 
 class MyActivity1(PlantumlActivity):
     def __init__(self, name, **options):
-        self.conn_1 = None # This connection ref shall bewfulfilled by Reflection
-        self.conn_2 = None # This connection ref shall bewfulfilled by Reflection
+        self.conn1 = None # This connection ref shall bewfulfilled by Reflection
+        self.conn2 = None # This connection ref shall bewfulfilled by Reflection
         super().__init__(name, **options)
         
     async def run(self, simulation):
         
-        if self.conn_1 == None or self.conn_2 == None:
+        if self.conn1 == None or self.conn2 == None:
             # To ensure that this simulation ca run.
             # As the connections are fulfilled by reflection at architecture,
             # not all instances of this class may be connected
@@ -153,17 +153,17 @@ class MyActivity1(PlantumlActivity):
         # print(f"New run: Starting async call for {self.name}...")
         simulation.set_simulation_activity_decorator(self)
         
-        result = await simulation.wait_message(self.conn_1)
+        result = await simulation.wait_message(self.conn1)
         
         simulation.set_simulation_decorator("alt #F2F2F2 sucess")
-        await simulation.send_message(self.conn_1, self, "message 2")
+        await simulation.send_message(self.conn1, self, "message 2")
         simulation.set_simulation_activate(self)
         simulation.set_simulation_decorator("else error")
-        await simulation.send_message(self.conn_1, self, "message 3")
+        await simulation.send_message(self.conn1, self, "message 3")
         simulation.set_simulation_decorator("end")
         # print(f"New run: Async call completed for {self.name}!, result message = {result}")   
         simulation.set_simulation_deactivate(self)
-        await simulation.send_message(self.conn_2, self, "message 4")
+        await simulation.send_message(self.conn2, self, "message 4")
             
 class MyComponent1(PlantumlComponent):
   
@@ -182,13 +182,13 @@ class MyActor(PlantumlActor):
 
     class MyActorActivity(PlantumlActivity):
         def __init__(self, name, **options):
-            self.conn_1 = None # This connection ref shall bewfulfilled by Reflection
+            self.conn1 = None # This connection ref shall bewfulfilled by Reflection
             super().__init__(name, **options)
         async def run(self, simulation):
             #conn = simulation.get_sub_obj_by_name("Conn 1")
             # print(f"New run: Starting async call for {self.name}...")
             simulation.set_simulation_activity_decorator(self)
-            await simulation.send_message(self.conn_1, self, "message 1")
+            await simulation.send_message(self.conn1, self, "message 1")
             # print(f"New run: Async call completed for {self.name}!")   
     
     def __init__(self, name, **options):
@@ -242,8 +242,8 @@ It can also be simulated.
 
         self.conn3b = PlantumlConnection("Conn 3B", self.class_activity, self.component6.state_activity2)
 
-        self.sm_conn = PlantumlConnection("SM Conn", [self.class_activity, self.component1.activity2], self.component6.state_activity)
-        self.mlt_conn = PlantumlConnection("Multiple Conn", self.component1.subcomp.activity2, [self.class_activity, self.component1.activity1])
+        self.smconn = PlantumlConnection("SM Conn", [self.class_activity, self.component1.activity2], self.component6.state_activity)
+        self.mltconn = PlantumlConnection("Multiple Conn", self.component1.subcomp.activity2, [self.class_activity, self.component1.activity1])
 
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
@@ -348,6 +348,6 @@ cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.co
 # print("\n New----------------------------------------------------------------------------------------")
 # introspect_object(new_arch)
 
-# TODO Create class diagram
+
 
 # A version of PlantumlConnection used only to align components on the screen: https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html

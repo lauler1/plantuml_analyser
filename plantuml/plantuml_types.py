@@ -9,7 +9,8 @@ def get_variable_names(obj, namespace):
     return [name for name in namespace if namespace[name] is obj]
 
 def sanitize_name(name):
-    return re.sub(r'\W|^(?=\d)', '_', name.lower())
+    # print(f"sanitize_name {name} -> {re.sub(r'\W|^(?=\d)', '', name.lower())}")
+    return re.sub(r'\W|^(?=\d)', '', name.lower())
 
 class ObjectRef:
     """
@@ -23,8 +24,10 @@ class ArchBreakLine():
     This class defines a PlantUML architectural breakline in the architecture layout.
     This function has no other function.
     """
-    def __init__(self, name="", **options):
+    def __init__(self, name="", id="", **options):
         self.type = "BreakLine"
+        self.name = name
+        self.id = id
 
 def post_init_decorator(init_func):
     def wrapper(self, *args, **kwargs):
@@ -56,10 +59,11 @@ class PlantumlType:
  
     # metadata_dict = {}
     @post_init_decorator
-    def __init__(self, name="", **options):
+    def __init__(self, name="", id="", **options):
         """
         Main constructor.
         name: The name of this component.
+        id: An identification for this component, without spaces and special characters (like in a variable name). Any space and special character will be removed.
         options:
             note: Add a not to the component, e.g.: note=r"This is a note\nfor a component"
             remove: Remove completely a component of drawing, e.g.: remove=True
@@ -68,7 +72,10 @@ class PlantumlType:
         """
         self.name = name
         self.type = "Type"
-        self.path = sanitize_name(name)
+        self.id = sanitize_name(id)
+        if self.id == "":
+            self.id = sanitize_name(name)
+        self.path = self.id # Initial path, will be replaced by architecture post init via set_architecture.
         self.metadata_dict = {"hide": False, "remove": False}
 
         #self.architecture = None
@@ -118,10 +125,10 @@ class PlantumlType:
         """
         if isinstance(value, ObjectRef):
             # print(f"Adding ref {value.ref.name}")
-            sanitized_name = sanitize_name(value.ref.name)
+            sanitized_name = sanitize_name(value.ref.id)
         elif isinstance(value, PlantumlType):
             # print(f"Adding obj {value.name}")
-            sanitized_name = sanitize_name(value.name)
+            sanitized_name = sanitize_name(value.id)
         else:
             return
         
@@ -165,6 +172,10 @@ class PlantumlType:
         return result
 
     def get_owner(self, object):
+        """
+        This is a recursive method that looks for the owner for an object from the current tree position.
+        Idealy it can be called from a base architecture to look inside the entire architecture tree of components.
+        """
         result = None
         for key, value in vars(self.__class__).items():
             if object == value:
@@ -228,34 +239,27 @@ class PlantumlType:
         # print (f"Obj '{name}' not found")
         return None
 
-    def get_sub_obj_by_name(self, name):
-        # Does not go recursive
+    def find_sub_obj_by_id_recursive(self, id):
+        # Goes recursive to find object
+        result = None
         for key, value in self.__dict__.items():
-            if isinstance(value, PlantumlType) and value.name == name:
-                # print (f"  Found obj '{name}' at instance level")
+            if isinstance(value, PlantumlType) and value.id == id:
+                # print (f"  Found obj '{id}' at instance level")
                 return value
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.find_sub_obj_by_name_recursive(id)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
         for key, value in vars(self.__class__).items():
-            if isinstance(value, PlantumlType) and value.name == name:
-                # print (f"  Found obj '{name}' at class level")
+            if isinstance(value, PlantumlType) and value.id == id:
+                # print (f"  Found obj '{id}' at class level")
                 return value
-        print (f"Obj '{name}' not found")
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.find_sub_obj_by_name_recursive(id)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        # print (f"Obj '{id}' not found")
         return None
-
-    def get_owner_tree(self, object):
-        owner_tree = []
-        current_owner = self.get_owner(object)
-
-        while current_owner is not None:
-            owner_tree.insert(0, current_owner)
-            current_owner = self.get_owner(current_owner)
-
-        return owner_tree
-
-    def get_complete_path_name(self, object):
-        owner_tree = self.get_owner_tree(object)
-        name_tree = [sanitize_name(item.name) for item in owner_tree]
-        name_tree.append(sanitize_name(object.name))
-        return "_".join(name_tree)
 
     def set_options(self, **options):
         """
@@ -292,8 +296,8 @@ class PlantumlContainer(PlantumlType):
     Parent class for all class that may contain other PlantumlType inside, a container.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "container"
         self.metadata_dict.update(options)
         # super().__post_init__()
@@ -303,8 +307,8 @@ class PlantumlGroup(PlantumlContainer):
     This class defines a PlantUML architectural 'together' to group components without any visible box.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "together"
         self.metadata_dict.update(options)
         # super().__post_init__()
@@ -314,8 +318,8 @@ class PlantumlActor(PlantumlContainer):
     This class defines a PlantUML architectural Actor.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Actor"
         self.metadata_dict.update(options)
         # super().__post_init__()
@@ -325,8 +329,8 @@ class PlantumlComponent(PlantumlContainer):
     This class defines a PlantUML architectural Component.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Component"
         self.metadata_dict.update(options)
 
@@ -335,8 +339,8 @@ class PlantumlFrame(PlantumlContainer):
     This class defines a PlantUML architectural Frame.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Frame"
         self.metadata_dict.update(options)
 
@@ -345,8 +349,8 @@ class PlantumlFolder(PlantumlContainer):
     This class defines a PlantUML architectural Folder.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Folder"
         self.metadata_dict.update(options)
 
@@ -355,8 +359,8 @@ class PlantumlDatabase(PlantumlContainer):
     This class defines a PlantUML architectural Database.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Database"
         self.metadata_dict.update(options)
 
@@ -365,8 +369,8 @@ class PlantumlPackage(PlantumlContainer):
     This class defines a PlantUML architectural Package.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Package"
         self.metadata_dict.update(options)
 
@@ -375,8 +379,8 @@ class PlantumlInterface(PlantumlType):
     This class defines a PlantUML architectural Interface.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Interface"
         self.metadata_dict.update(options)
 
@@ -385,8 +389,8 @@ class PlantumlInterface(PlantumlType):
     # This class defines a PlantUML architectural Port.
     # See base class PlantumlType for more.
     # """
-    # def __init__(self, name="", **options):
-        # super().__init__(name)
+    # def __init__(self, name="", id="", **options):
+        # super().__init__(name, id)
         # self.type = "Port"
         # self.metadata_dict.update(options)
 
@@ -395,8 +399,8 @@ class PlantumlActivity(PlantumlType):
     This class defines a PlantUML architectural Activity.
     See base class PlantumlType for more.
     """
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Activity"
         self.metadata_dict.update(options)
         # super().__post_init__()
@@ -426,8 +430,8 @@ class PlantumlArchitecture(PlantumlContainer):
     """
 
     @plantuml_architecture_decorator
-    def __init__(self, name="", **options):
-        super().__init__(name)
+    def __init__(self, name="", id="", **options):
+        super().__init__(name, id)
         self.type = "Architecture"
         self.metadata_dict["layout_connectors"] = [] # Connections used to force placing components next other
         self.metadata_dict["orientation"] = "left to right direction"
@@ -472,12 +476,16 @@ skinparam linetype ortho
             if isinstance(value, PlantumlType):
                 if value.name == "":
                     value.name = key
+                if value.id == "":
+                    value.id = key
                 value.set_architecture(self)
                 self._recursive_post_init(value)
         for key, value in curr_obj.__dict__.items():
             if isinstance(value, PlantumlType):
                 if value.name == "":
                     value.name = key
+                if value.id == "":
+                    value.id = key
                 value.set_architecture(self)
                 self._recursive_post_init(value)
     
@@ -526,13 +534,55 @@ skinparam linetype ortho
                 self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[#blue]r-", ObjectRef(item[1])))
                 # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]r- {item[1].path}")
 
+    def get_sub_obj_by_name(self, name):
+        # Does not go recursive
+        for key, value in self.__dict__.items():
+            if isinstance(value, PlantumlType) and value.name == name:
+                # print (f"  Found obj '{name}' at instance level")
+                return value
+        for key, value in vars(self.__class__).items():
+            if isinstance(value, PlantumlType) and value.name == name:
+                # print (f"  Found obj '{name}' at class level")
+                return value
+        print (f"Obj '{name}' not found")
+        return None
+
+    def get_sub_obj_by_id(self, id):
+        # Does not go recursive
+        for key, value in self.__dict__.items():
+            if isinstance(value, PlantumlType) and value.id == id:
+                # print (f"  Found obj '{id}' at instance level")
+                return value
+        for key, value in vars(self.__class__).items():
+            if isinstance(value, PlantumlType) and value.id == id:
+                # print (f"  Found obj '{id}' at class level")
+                return value
+        print (f"Obj '{id}' not found")
+        return None
+
+    def get_owner_tree(self, object):
+        owner_tree = []
+        current_owner = self.get_owner(object)
+
+        while current_owner is not None:
+            owner_tree.insert(0, current_owner)
+            current_owner = self.get_owner(current_owner)
+
+        return owner_tree
+
+    def get_complete_path_name(self, object):
+        owner_tree = self.get_owner_tree(object)
+        name_tree = [item.id for item in owner_tree]
+        name_tree.append(object.id)
+        return "_".join(name_tree)
+
 class PlantumlConnection(PlantumlType):
     """
     This class defines a PlantUML architectural Connection between two components.
     Usually connecting actors, components or activities, but also interfaces and ports.
     See base class PlantumlType for more.
     """
-    def __init__(self, name, comp1, comp2, **options):
+    def __init__(self, name, comp1, comp2, id="", **options):
         """
         Main constructor.
         
@@ -551,7 +601,7 @@ class PlantumlConnection(PlantumlType):
             line: plantuml connection line/arrow, e.g. "--", "->", "<-",... Default line used is "--"
             
         """
-        super().__init__(name)
+        super().__init__(name, id)
         self.type = "ArchView"
         
         self.metadata_dict["direction"] = "inout"
@@ -600,8 +650,8 @@ def go_through_connections(object, architecture):
     def proc_value(value):
         owner = architecture.get_owner(value)
         owner_name = ""
-        if isinstance(owner, PlantumlType):
-            owner_name = owner.name
+        # if isinstance(owner, PlantumlType):
+            # owner_name = owner.name
         # Reconstruct comp1 with the new references
         if isinstance(value.comp1, list):
             comp1 = []

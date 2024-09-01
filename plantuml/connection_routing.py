@@ -677,10 +677,10 @@ def test(arch: pt.PlantumlArchitecture, comp: list[pt.PlantumlType]):
     component1_activity1 = comp[2]
     component2_activity1 = comp[3]
 
-    print_obj_abs_pos_dim(arch, super_arch1_activity1);
-    print_obj_abs_pos_dim(arch, super_arch1_activity2);
-    print_obj_abs_pos_dim(arch, component1_activity1);
-    print_obj_abs_pos_dim(arch, component2_activity1);
+    # print_obj_abs_pos_dim(arch, super_arch1_activity1);
+    # print_obj_abs_pos_dim(arch, super_arch1_activity2);
+    # print_obj_abs_pos_dim(arch, component1_activity1);
+    # print_obj_abs_pos_dim(arch, component2_activity1);
 
     # ----------------------------------------------------------------
     
@@ -690,11 +690,11 @@ def test(arch: pt.PlantumlArchitecture, comp: list[pt.PlantumlType]):
     # are_components_in_same_row(arch, super_arch1_activity1, component1_activity1)
     # are_components_in_same_column(arch, super_arch1_activity1, component1_activity1)
 
-    get_vertical_overlapping(arch, super_arch1_activity1, super_arch1_activity2)
-    get_horizontal_overlapping(arch, super_arch1_activity1, super_arch1_activity2)
+    # get_vertical_overlapping(arch, super_arch1_activity1, super_arch1_activity2)
+    # get_horizontal_overlapping(arch, super_arch1_activity1, super_arch1_activity2)
 
-    get_vertical_overlapping(arch, super_arch1_activity1, component1_activity1)
-    get_horizontal_overlapping(arch, super_arch1_activity1, component1_activity1)
+    # get_vertical_overlapping(arch, super_arch1_activity1, component1_activity1)
+    # get_horizontal_overlapping(arch, super_arch1_activity1, component1_activity1)
 
 
     # ----------------------------------------------------------------

@@ -102,7 +102,7 @@ def get_absolute_coordinates(arch, obj):
     if x1 is not None and y1 is not None and dx is not None and dy is not None: 
         x2 = x1 + dx
         y2 = y1 + dy
-        return x1, y1, x2, y2
+        return int(x1), int(y1), int(x2), int(y2)
     return None, None, None, None
 
 def subtract_ranges(reference: tuple[int, int], exclusions: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -816,31 +816,57 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
     """
 
     def print_single_conn(x1, y1, x2, y2, text = ""):
+        # print_html_comment_indent(f"print_single_conn {type(x1)} {type(y1)} {type(x2)} {type(y2)}")
+        text_anchor = "start"
+        if x2 < x1:
+            text_anchor = "end"
+
+        if int(y2) > int(y1):
+            rotate = 90
+        elif int(y2) < int(y1):
+            rotate = -90
+        else:
+            rotate = 0
+
+
         return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="blue" stroke-width="1" />\n \
-<text x="{x1}" y="{y1}" font-family="Courier New" font-size="20px" fill="blue" font-weight="bold">{text}</text>'
+<text x="{x1+3}" y="{y1-3}" font-family="Courier New" font-size="12px" fill="blue" text-anchor="{text_anchor}" transform="rotate({rotate} {x1},{y1})">{text}</text>'
 
     def print_poly_conn(points, text = ""):
         # return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="blue" stroke-width="3" />'
         # <text x="{x1}" y="{y1}" font-family="Courier New" font-size="20px" fill="blue" font-weight="bold">{text}</text>'
+
+        text_anchor = "start"
+        if points[1][0] < points[0][0]:
+            text_anchor = "end"
+        
+        rotate = 0
+        if points[1][1] > points[0][1]:
+            rotate = 90
+        elif points[1][1] < points[0][1]:
+            rotate = -90
         
         point_str_list = []
         for point in points:
             point_str_list.append(f"{point[0]},{point[1]}")
         points_str = " ".join(point_str_list)
         return f'<polyline points="{points_str}" fill="none" stroke="blue" stroke-width="1" />\n \
-<text x="{points[0][0]}" y="{points[0][1]}" font-family="Courier New" font-size="20px" fill="blue" font-weight="bold">{text}</text>'
+<text x="{points[0][0] + 3}" y="{points[0][1] - 3}" font-family="Courier New" font-size="12px" fill="blue" transform="rotate({rotate} {points[0][0]},{points[0][1]})"  text-anchor="{text_anchor}" >{text}</text>'
 
     print_html_comment_indent(f"route_single_comonnection: {name} {comp1.name} {comp1.path}", indent) # false
     print_html_comment_indent(f"                           {name} {comp2.name} {comp2.path}", indent) # false
     conn_str = ""
 
-    # if name != "Conn 2": # and name != "Conn 5" and name != "Conn 6": # Turn others of for debugging
+    # if name != "Multiple Conn:0": # name != "Conn 3" and name != "Conn 5" and name != "Conn 6": # Turn others of for debugging
         # return {name:""}
 
 
     # Estimate direction
     c1_x1, c1_y1, c1_x2, c1_y2 = get_absolute_coordinates(arch, comp1)
     c2_x1, c2_y1, c2_x2, c2_y2 = get_absolute_coordinates(arch, comp2)
+    
+    # print(f" get_absolute_coordinates {c1_x1}, {c1_y1}, {c1_x2}, {c1_y2}")
+    # print(f" get_absolute_coordinates {c2_x1}, {c2_y1}, {c2_x2}, {c2_y2}")
     
     print_html_comment_indent(f"{comp1.name} {highway_map['addresses'][comp1.path]}", indent)
     print_html_comment_indent(f"  pos = ({c1_x1}, {c1_y1}) ({c1_x2}, {c1_y2})", indent)
@@ -864,16 +890,16 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
             dir = Dir.LEFT
         free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y1, c1_x2, c1_y2), (c2_x1, c2_y1, c2_x2, c2_y2), dir, pt.PlantumlActivity, indent+1)
 
-        y = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges)
+        if c1_x2 < c2_x1:
+            x1 = c1_x2
+            x2 = c2_x1
+        else: 
+            x1 = c2_x2
+            x2 = c1_x1
+        y = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges, [x1, None, x2, None])
         if y != None:
             csm.allocate_the_border_offset(highway_map, comp2.path, opposit(dir), y) # also save this in the other comp
-            if c1_x2 < c2_x1:
-                x1 = c1_x2
-                x2 = c2_x1
-            else: 
-                x1 = c2_x2
-                x2 = c1_x1
-            csm.allocate_offroad_horizontal_lane(highway_map, [x, y1, x, y2]) # also save this as an offroad lane, it has no road
+            csm.allocate_offroad_horizontal_lane(highway_map, [x1, y, x2, y]) # also save this as an offroad lane, it has no road
             conn_str = print_single_conn(x1, y, x2, y, name)
             finished = True
 
@@ -885,15 +911,16 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
             dir = Dir.UP
         free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y1, c1_x2, c1_y2), (c2_x1, c2_y1, c2_x2, c2_y2), dir, pt.PlantumlActivity, indent+1)
         
-        x = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges)
+        if c1_y2 < c2_y1:
+            y1 = c1_y2
+            y2 = c2_y1
+        else: 
+            y1 = c2_y2
+            y2 = c1_y1
+        x = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges, [None, y1, None, y2])
+        # x = csm.allocate_an_address_on_border(highway_map, comp2.path, opposit(dir), free_ranges, [None, y, None, y2])
         if x != None:
             csm.allocate_the_border_offset(highway_map, comp2.path, opposit(dir), x) # also save this in the other comp
-            if c1_y2 < c2_y1:
-                y1 = c1_y2
-                y2 = c2_y1
-            else: 
-                y1 = c2_y2
-                y2 = c1_y1
             csm.allocate_offroad_vertical_lane(highway_map, [x, y1, x, y2]) # also save this as an offroad lane, it has no road
             conn_str = print_single_conn(x, y1, x, y2, name)
             finished = True
@@ -929,10 +956,10 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 print_html_comment_indent(f'comp1 goes down if comp2 side is free')
                 free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y2, c1_x2, range1[1]), (c2_x1, c2_y1, c2_x2, c2_y2), dir, pt.PlantumlActivity, indent+1)
                 if len(free_ranges) > 0:
-                    x = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.DOWN, [(c1_x1, c1_x2)])
-                    y = csm.allocate_an_address_on_border(highway_map, comp2.path, opposit(dir), free_ranges)
                     x2 = c2_x1 if dir == Dir.RIGHT else c2_x2
-                    if y != None and x != None and csm.is_free_offroad_horizontal_lane(highway_map, [x ,y ,x2 ,y]):
+                    x = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.DOWN, [(c1_x1, c1_x2)])
+                    y = csm.allocate_an_address_on_border(highway_map, comp2.path, opposit(dir), free_ranges, [x ,None ,x2 ,None])
+                    if y != None and x != None: # and csm.is_free_offroad_horizontal_lane(highway_map, [x ,y ,x2 ,y]):
                         road_points = [(x, c1_y2), (x, y), (x2, y)]
 
                         csm.allocate_offroad_horizontal_lane(highway_map, [x ,y ,x2 ,y]) # also save this as an offroad lane, it has no road
@@ -940,12 +967,12 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                         finished = True
             else: # Criterion 2, comp2 goes down if comp1 side is free
                 print_html_comment_indent(f'comp2 goes down if comp1 side is free')
-                free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y1, c1_x2, c1_y2), (c2_x1, c2_y2, c2_x2, range1[1]), opposit(dir), pt.PlantumlActivity, indent+1)
+                free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y1, c1_x2, c1_y2), (c2_x1, c2_y2, c2_x2, range1[1]), dir, pt.PlantumlActivity, indent+1)
                 if len(free_ranges) > 0:
-                    x = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.DOWN, [(c2_x1, c2_x2)])
-                    y = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges)
                     x1 = c1_x2 if dir == Dir.RIGHT else c1_x1
-                    if y != None and x != None and csm.is_free_offroad_horizontal_lane(highway_map, [x1 ,y ,x ,y]):
+                    x = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.DOWN, [(c2_x1, c2_x2)])
+                    y = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges, [x1 ,None ,x ,None])
+                    if y != None and x != None: # and csm.is_free_offroad_horizontal_lane(highway_map, [x1 ,y ,x ,y]):
                         road_points = [(x1, y), (x, y), (x, c2_y2)]
 
                         csm.allocate_offroad_horizontal_lane(highway_map, [x1 ,y ,x ,y]) # also save this as an offroad lane, it has no road
@@ -954,7 +981,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
 
         elif range2 != None:    
             print_html_comment_indent(f' Connection {name}: get_rects_if_components_between_common_vertical_lanes TRUE ********************************************** {comp1.name} {comp2.name}', indent+1)
-            print(" Criteria12 elif range2 != None ---------------------------------------------------------------")
+            # print(" Criteria12 elif range2 != None ---------------------------------------------------------------")
             # Give priority to go left or vertically, to avoid passing over titles
             if c1_y2 < c2_y1:
                 dir = Dir.DOWN
@@ -962,31 +989,33 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 dir = Dir.UP
 
             if c1_x2 < c2_x2: # Main criterion, comp1 goes Right if comp2 top/bottom is free
-                print(" Criteria12 c1_x2 < c2_x2 ---------------------------------------------------------------")
+                # print(" Criteria12 c1_x2 < c2_x2 ---------------------------------------------------------------")
                 free_ranges = get_free_obstacle_ranges(arch, (c1_x2, c1_y2, range2[1], c1_y2), (c2_x1, c2_y1, c2_x2, c2_y2), dir, pt.PlantumlActivity, indent+1)
+                # print(f" Criteria12 check dir = {dir}")
                 if len(free_ranges) > 0:
-                    y = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.RIGHT, [(c1_y1, c1_y2)])
-                    x = csm.allocate_an_address_on_border(highway_map, comp2.path, opposit(dir), free_ranges)
                     y2 = c2_y1 if dir == Dir.DOWN else c2_y2
-                    if y != None and x != None and csm.is_free_offroad_vertical_lane(highway_map, [x, y, x, y2]):
+                    y = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.RIGHT, [(c1_y1, c1_y2)])
+                    x = csm.allocate_an_address_on_border(highway_map, comp2.path, opposit(dir), free_ranges, [None, y, None, y2])
+                    if y != None and x != None: # and csm.is_free_offroad_vertical_lane(highway_map, [x, y, x, y2]):
                         road_points = [(c1_x2, y), (x, y), (x, y2)]
 
                         csm.allocate_offroad_vertical_lane(highway_map, [x, y, x, y2]) # also save this as an offroad lane, it has no road
                         conn_str = print_poly_conn(road_points, name)
                         finished = True
             else: # Criterion 2, comp2 goes Right if comp1 side is free
-                print(" Criteria12 else ---------------------------------------------------------------")
-                free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y1, c1_x2, c1_y2), (c2_x2, c2_y1, range2[1], c2_y2), opposit(dir), pt.PlantumlActivity, indent+1)
-                print(f" Criteria12 free_ranges = {free_ranges}")
-                print(f" Criteria12 range2 = {range2}")
-                print(f" Criteria12 comp1 range = {(c1_x1, c1_x2)}")
-                print(f" Criteria12 comp2 range = {(c2_x2, range2[1])}")
+                # print(" Criteria12 else ---------------------------------------------------------------")
+                free_ranges = get_free_obstacle_ranges(arch, (c1_x1, c1_y1, c1_x2, c1_y2), (c2_x2, c2_y1, range2[1], c2_y2), dir, pt.PlantumlActivity, indent+1)
+                # print(f" Criteria12 check dir = {dir}")
+                # print(f" Criteria12 free_ranges = {free_ranges}")
+                # print(f" Criteria12 range2 = {range2}")
+                # print(f" Criteria12 comp1 range = {(c1_x1, c1_x2)}")
+                # print(f" Criteria12 comp2 range = {(c2_x2, range2[1])}")
 
                 if len(free_ranges) > 0:
-                    y = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.RIGHT, [(c2_y1, c2_y2)])
-                    x = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges)
                     y1 = c1_y2 if dir == Dir.DOWN else c1_y1
-                    if y != None and x != None and csm.is_free_offroad_vertical_lane(highway_map, [x, y1, x, y]):
+                    y = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.RIGHT, [(c2_y1, c2_y2)])
+                    x = csm.allocate_an_address_on_border(highway_map, comp1.path, dir, free_ranges, [None, y1, None, y])
+                    if y != None and x != None: # and csm.is_free_offroad_vertical_lane(highway_map, [x, y1, x, y]):
                         road_points = [(x, y1), (x, y), (c2_x2, y)]
 
                         csm.allocate_offroad_vertical_lane(highway_map, [x, y1, x, y]) # also save this as an offroad lane, it has no road
@@ -1001,7 +1030,6 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
     if not finished:
         # get the exit direction, according to the dest direction and the orientation.
         
-        
         print_html_comment_indent(f'------------------------------------------')
         print_html_comment_indent(f'Routing comp1 = {comp1.name}')
         # go down the hierarchy of the first comp to find a road belonging the component common to both ends
@@ -1012,6 +1040,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
         print_html_comment_indent(f' {comp1.name}: address map = {address}', indent+1)
         if Dir.LEFT in address or Dir.RIGHT in address:
             if dir_vec[0] > 0:
+                # print(f'Criterion 3, con1 starts RIGHT')
                 road = address[Dir.RIGHT]
                 x = c1_x2
                 # y = int(c1_y1 + c1_y2) / 2
@@ -1019,6 +1048,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 r_x = lane = csm.allocate_a_road_lane(highway_map, road)
                 r_y = y
             else:
+                # print(f'Criterion 3, con1 starts LEFT')
                 road = address[Dir.LEFT]
                 x = c1_x1
                 # y = int(c1_y1 + c1_y2) / 2
@@ -1027,6 +1057,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 r_y = y
         else: # Dir.UP in address or Dir.DOWN in address:
             if dir_vec[1] > 0:
+                # print(f'Criterion 3, con1 starts DOWN')
                 road = address[Dir.DOWN]
                 # x = int(c1_x1 + c1_x2) / 2
                 x = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.DOWN, [(c1_x1, c1_x2)])
@@ -1034,6 +1065,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 r_x = x
                 r_y = lane = csm.allocate_a_road_lane(highway_map, road)
             else:
+                # print(f'Criterion 3, con1 starts UP')
                 road = address[Dir.UP]
                 # x = int(c1_x1 + c1_x2) / 2
                 x = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.UP, [(c1_x1, c1_x2)])
@@ -1270,6 +1302,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 y1 = last_coord1[1]
                 x2 = x1
                 y2 = last_coord2[1]
+            
             else: # If DirType.VERTICAL
                 dist_to_end_1 = csm.get_closest_vertical_dist_to_end(highway_map, prev_road1[0], last_coord1[1])
                 dist_to_end_2 = csm.get_closest_vertical_dist_to_end(highway_map, prev_road2[0], last_coord2[1])
@@ -1280,6 +1313,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x1 = last_coord1[0]
                 y2 = y1
                 x2 = last_coord2[0]
+            
             road_points_center = [(x1, y1), (x2, y2)]
 
         

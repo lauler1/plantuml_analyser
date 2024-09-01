@@ -431,7 +431,7 @@ class PlantumlArchitecture(PlantumlContainer):
         self.type = "Architecture"
         self.metadata_dict["layout_connectors"] = [] # Connections used to force placing components next other
         self.metadata_dict["orientation"] = "left to right direction"
-        # self.metadata_dict["orientation"] = "top to bottom direction" # this is the orientation of plantuml arrows
+        self.metadata_dict["orientation"] = "top to bottom direction" # this is the orientation of plantuml arrows
         self.metadata_dict["skinparam"] = """
 skinparam note{
   BackgroundColor #FFFFCB

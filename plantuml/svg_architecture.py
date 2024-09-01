@@ -14,7 +14,9 @@ class Orientation(Enum):
     TOP_DOWN = 1
     
 default_style = { \
-         "margin":10, # Separation space outside the rectangle border of a component\
+
+         "root_margin":20, # Extra separation space outside the rectangle border of the root architeture\
+         "margin":15, # Separation space outside the rectangle border of a component\
          "padding":10, # Separation space inside the rectangle border of a component\
          "title-height": 25,\
          "title-font-family":"Consolas",\
@@ -106,7 +108,7 @@ def predict_single_connection(arch, obj1, obj2):
     return normalize_vector((x2-x1, y2-y1))
 
 def calc_bord_pos(arch, obj, comp1_vec):
-    print_html_comment_indent(f"  calc_bord_pos obj name = {obj.name}")
+    # print_html_comment_indent(f"  calc_bord_pos obj name = {obj.name}")
     
     x, y = cr.get_absolute_pos(arch, obj)
     # x = obj.metadata_dict["rect_x_pos"]
@@ -115,7 +117,7 @@ def calc_bord_pos(arch, obj, comp1_vec):
     height = obj.metadata_dict["rect_y_len"]
     
     res = cr.find_rect_border_intersection(x, y, width, height, comp1_vec[0], comp1_vec[1])
-    print_html_comment_indent(f"   calc_bord_pos res = {res}")
+    # print_html_comment_indent(f"   calc_bord_pos res = {res}")
     return res
 
 def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
@@ -138,14 +140,14 @@ def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
         x = 0
         y = 0
         for idx, v in enumerate(vec_list):
-            print_html_comment_indent(f"   average_vec ({v[0]}, {v[1]})")
+            # print_html_comment_indent(f"   average_vec ({v[0]}, {v[1]})")
             x += v[0]
             y += v[1]
         
         magnitude = math.sqrt(x**2 + y**2)
         if magnitude == 0:
             return (0, 0)
-        print_html_comment_indent(f"   average_vec ret ({x / magnitude}, {y / magnitude})")
+        # print_html_comment_indent(f"   average_vec ret ({x / magnitude}, {y / magnitude})")
         return (x / magnitude, y / magnitude)
         
     style = {"color":"black"} # Provision for ... TBD
@@ -169,15 +171,15 @@ def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
     comp1_vec = []
     comp2_vec = []
     if isinstance(plantuml_obj.comp1, list):
-        print_html_comment_indent(f"Case 1 (multiples to one)")
+        # print_html_comment_indent(f"Case 1 (multiples to one)")
         comp2 = plantuml_obj.comp2.ref
         for item in plantuml_obj.comp1:
             comp1 = item.ref
             # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
             comp1_vec.append(predict_single_connection(arch, comp1, comp2))
-        print_html_comment_indent(f"   comp1_vec {comp1_vec}")
+        # print_html_comment_indent(f"   comp1_vec {comp1_vec}")
         comp2_vec.append(invert_vec(average_vec(comp1_vec)))
-        print_html_comment_indent(f"   comp1_vec = {comp1_vec} comp2_vec = {comp2_vec[0]}")
+        # print_html_comment_indent(f"   comp1_vec = {comp1_vec} comp2_vec = {comp2_vec[0]}")
     elif isinstance(plantuml_obj.comp2, list):
         # print_html_comment_indent(f"Case 2 (one to multiples)")
         comp1 = plantuml_obj.comp1.ref
@@ -227,7 +229,7 @@ def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
             conn_str = draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}"
     return {name:conn_str}
 
-def get_all_connections(arch, connections):
+def get_all_connections(arch, connections, highway_map):
     
     def get_all_connections_recurrent(arch, obj, connections):
         if isinstance(obj, pt.PlantumlContainer):
@@ -235,7 +237,9 @@ def get_all_connections(arch, connections):
                 if isinstance(value, pt.PlantumlConnection):
                     if value.is_visible():
                         # Add this connection to the connections dictionary
-                        connections.update(create_svg_comonnection(arch, value.name, value))
+                        # connections.update(create_svg_comonnection(arch, value.name, value)) # Old method
+                        connections.update(cr.route_svg_comonnection(arch, value.name, value, highway_map)) # New Method
+                        
 
                 elif isinstance(value, pt.PlantumlType):
                     get_all_connections_recurrent(arch, value, connections)
@@ -317,14 +321,18 @@ def calculate_comments_dim(comments, margin=50):
     return comment_width, comment_height
 
 def print_svg_component(name, obj, indent=0):
-    x = obj.metadata_dict["rect_x_pos"]
-    y = obj.metadata_dict["rect_y_pos"]
-    width = obj.metadata_dict["rect_x_len"]
-    height = obj.metadata_dict["rect_y_len"]
+    x = cr.get_obj_prop(obj, "rect_x_pos")
+    y = cr.get_obj_prop(obj, "rect_y_pos")
+    width = cr.get_obj_prop(obj, "rect_x_len", 50)
+    height = cr.get_obj_prop(obj, "rect_y_len", 50)
+    # x = obj.metadata_dict["rect_x_pos"]
+    # y = obj.metadata_dict["rect_y_pos"]
+    # width = obj.metadata_dict["rect_x_len"]
+    # height = obj.metadata_dict["rect_y_len"]
     text_length = width
     
-    title_font_family = obj.metadata_dict["title-font-family"]
-    title_font_size = obj.metadata_dict["title-font-size"]
+    title_font_family = cr.get_obj_prop(obj, "title-font-family", "Consolas")
+    title_font_size = cr.get_obj_prop(obj, "title-font-size", "15px")
     
   # BackgroundColor #C5FFA6
   # BorderColor #145B17
@@ -365,35 +373,57 @@ def print_svg_component(name, obj, indent=0):
         print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" style="fill: none; stroke: black; stroke-width: 1px;" stroke-dasharray="2, 2"/>', indent)
         print_with_indent(f'<text x="{x+5}" y="{y+20}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{name}</text>', indent)
 
+def print_svg_rect(name: str, rect: list[int|float, int|float, int|float, int|float], color: str = "red", fill: str ="gray", fill_opacity: str="0.2"):
+    """
+    This function can be use to draw a svg rectangle with name for debugging
+    name: a String with the lable name
+    rect: a list[x, y, width, height]
+    color: optional svg color (text and border). Default = red
+    fill: optional svg color to fill the rectangle. Default = none (transparent)
+    """
+    print_with_indent(f'<rect x="{rect[0]}" y="{rect[1]}" width="{rect[2]}" height="{rect[3]}" fill="{fill}" stroke="{color}" stroke-width="1" fill-opacity="{fill_opacity}"/>')
+    print_with_indent(f'<text x="{rect[0]+5}" y="{rect[1]+10}" font-family="Consolas" font-size="15px", fill="{color}" >{name}</text>')
+    
 def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     """
-    This function creates a simple svg output representation of the architecture.
+    This function creates a simple svg layout output representation of the architecture.
+    
+    This is an alternative to plantuml_architecture using SVG instead. It places the components always in a predictable orientation.
     
     
-    This is an alternative to plantuml_architecture, but with SVG instead of plantuml. It places the components always in a predictable layout.
-    
-    if an element has no name, then the variable name will be automaticaly applied as name.
+    highway_map is a dictionary that is filled by the inner function recurrent_layout_sizing that contains the roads where connections can pass, the addresses of the componnets on the roads and the allocation of connections in the lanes of the road. A road can be main or secundary. Each component may have multiple lanes along the orientation of the component (row or column), the name of the road contains 3 parts separated by space: a charactyer stating if it is a main ('M') or secundary ('S'), the name of the component owning the lane, and an index starting on 0. Secundary roads are placed only in the beginning and at the end of a component to connect main roads. The dictionary has the following structure:
+    - roads: Contains the definition and states of all lanes.
+        - rects: The screen representation of a lane as a long rectangle.
+        - orientations: the direction of the roads, HORIZONTAL or VERTICAL
+        - allocations: Used to control the lane state (perpendicular position on a road) where a connection passes through.
+    - addresses: Contains all the components with the information what are the lanes passing by and the allocations of the connections around the componnet.
+    - final: Just lists all the lanes that are the last one (bottom most or left most) inside a component.
+
     Argumnets:
-        plantuml_arch -- A class of a PlantumlType type.
-        kwargs -- Optional key/value arguments.
+        plantuml_arch: A class of a PlantumlType type.
+        style: The style dictionary (E.g. pading, colors, fonts) expected for this layout
+        kwargs: Optional key/value arguments (TBD).
     """
-    # rect_min_x_len": 400, "rect_min_y_len": 200, "rect_x_pos":None, "rect_y_pos":None, "rect_x_len":None, "rect_y_len":None
-    def recurrent_dim(obj, style, orientation = Orientation.LEFT_RIGHT, indent=0):
+    
+    highway_map = {"roads": {"rects": {}, "orientations": {}, "allocations": {}}, "addresses": {}, "final": []} # Creates a map of roads and streets for connection routing
+
+    def recurrent_layout_sizing(obj, orientation = Orientation.LEFT_RIGHT, indent=0):
         # Creates the layout retangles of the architecture.
-        # All coordinates are relative to the parent component. To get an absolute coordinates use get_absolute_pos or get_absolute_center from plantuml.connection_routing.
-        
-        # Preparing  coordination variables for dual orientation inside the subcomponents loop.
-        #   Replacing x and y for u and v.
-        #   Replacing widht and height with len_u and len_v
+        # All coordinates are relative to the parent component.
+        # To get an absolute coordinates use get_absolute_pos or get_absolute_center from plantuml.connection_routing.
+        # style and highway_map are accessed using closure principle (captured from the parent function)
+        #
+        # Chenged coordination names due to the dual orientation possibilities inside the subcomponents loop.
+        #   Originally it used variables x and y, but they were good for one orientation only.
+        #   Now with the orientation, x could become y and y become x, so it was decided to change the names
+        #   Replaced x and y with u and v.
+        #   Replaced widht and height with len_u and len_v
         #    current_x -> current_u
         #    current_y -> current_v
         #    row_heights -> line_len_us
         #    max_row_height -> max_line_len_u
         #    max_width -> max_len_u
         #    max_height-> max_len_v
-        
-        #self.metadata_dict["orientation"] = "left to right direction"
-        #self.metadata_dict["orientation"] = "top to bottom direction"
         
         if orientation == Orientation.LEFT_RIGHT:
             rect_min_u_len = 'rect_min_y_len'
@@ -409,8 +439,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
             rect_v_pos = 'rect_y_pos'
             rect_u_len = 'rect_x_len'
             rect_v_len = 'rect_y_len'
-            
-        
+
         #{"margin":20, "padding":20, "title-height": 50}
         if (isinstance(obj, pt.PlantumlType) or isinstance(obj, pt.ArchBreakLine))and not isinstance(obj, pt.PlantumlConnection) and obj.metadata_dict['remove'] == False:
         
@@ -429,38 +458,91 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 for key, child in list_of_obj:
                     if not isinstance(child, pt.PlantumlType) or isinstance(child, pt.PlantumlConnection):
                         continue
-                    recurrent_dim(child, style, orientation, indent+1)
+                    recurrent_layout_sizing(child, orientation, indent+1)
                 
                 margin = cr.get_obj_prop(obj, 'margin', style['margin'])
                 padding = cr.get_obj_prop(obj, 'padding', style['padding'])
                 title_height = cr.get_obj_prop(obj, 'title-height', style['title-height'])
                 
-                current_u = margin + padding
-                current_v = margin + padding
+                current_u = 0
+                current_v = 0
                 
+                extra_margin = 0
+                if obj == plantuml_arch: # The root architecture has extra margins for connections
+                    extra_margin = style["root_margin"]
+                    # print_with_indent(f" ----------------> plantuml_arch={obj}", indent)
+
+                current_u += margin + padding + extra_margin
+                current_v += margin + padding + extra_margin
+                last_u = current_u
+                last_v = current_v
+                    
+                # else: # Do not add title to architecture
                 if orientation == Orientation.LEFT_RIGHT:
+                    road_orientation = cr.DirType.VERTICAL
                     current_u += title_height
+                    road_w = current_v
+                    road_h = current_u
+                    addr_pos = [cr.Dir.LEFT, cr.Dir.RIGHT] # The two directions to the closest roads for a component address
                 else:
+                    road_orientation = cr.DirType.HORIZONTAL
                     current_v += title_height
-                
+                    road_w = current_u
+                    road_h = current_v
+                    addr_pos = [cr.Dir.UP, cr.Dir.DOWN]
+
                 line_len_us = []
                 max_line_len_u = 0
                 
+                
+                # highway_map - The main roads follow the main orientation of the layout
+                # Create first main road (Up or Left, depending on the orientation)
+                main_road_index = 0
+                road_name = f"M {obj.path} {main_road_index}"
+                local_roads_map = {"rects": {}, "orientations": {}, "allocations": {}}
+                road_x = 0
+                road_y = 0
+                local_roads_map["rects"][road_name] = [int(road_x), int(road_y), int(road_w), int(road_h)]
+                local_roads_map["orientations"][road_name] = road_orientation
+                local_roads_map["allocations"][road_name] = []
+
                 text_with = calculate_text_dim(obj.name, style["title-font-size"])
                 icon_space = calculate_icon_space(obj, style)
-                print_html_comment_indent(f"text_with: {text_with} for {obj.name}")               
-                max_len_u  = max(obj.metadata_dict[rect_min_u_len], text_with + icon_space, (2*margin) + (2*padding))
-                max_len_v = max(obj.metadata_dict[rect_min_v_len], (2*margin) + (2*padding) + title_height)
+                # print_html_comment_indent(f"text_with: {text_with} for {obj.name}")               
+                max_len_u  = max(obj.metadata_dict[rect_min_u_len], text_with + icon_space, (2*margin) + (2*padding) + (2*extra_margin))
+                max_len_v = max(obj.metadata_dict[rect_min_v_len], (2*margin) + (2*padding) + (2*extra_margin) + title_height)
                 
                 for key, child in obj.__dict__.items(): # Use __dict__ to keep decl order
                     
                     if isinstance(child, pt.ArchBreakLine):
-                        current_u = margin + padding
-                        current_v += (max_line_len_u + (2*margin))
+                        current_u = margin + padding + extra_margin
+                        current_v += (max_line_len_u + (2*margin) + (2*extra_margin))
                         # print_with_indent(f" ----------------> Break new pos=({current_u}, {current_v})", indent)
+                        
+                        # Add a new road
+                        main_road_index += 1
+                        road_name = f"M {obj.path} {main_road_index}"
+                        # else: # Do not add title to architecture
+                        if orientation == Orientation.LEFT_RIGHT:
+                            # current_u += title_height
+                            road_x = (last_v + max_line_len_u)
+                            road_y = 0
+                            road_w = (2*margin) + (2*extra_margin)
+                            road_h = last_u
+                        else:
+                            # current_v += title_height
+                            road_x = 0
+                            road_y = (last_v + max_line_len_u)
+                            road_w = last_u
+                            road_h = (2*margin) + (2*extra_margin)
+                        local_roads_map["rects"][road_name] = [int(road_x), int(road_y), int(road_w), int(road_h)]
+                        local_roads_map["orientations"][road_name] = road_orientation
+                        local_roads_map["allocations"][road_name] = []
+
                         line_len_us = []
                         max_line_len_u = 0
-                        
+
+                
                     if not isinstance(child, pt.PlantumlType) or isinstance(child, pt.PlantumlConnection):
                         continue
 
@@ -470,26 +552,66 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                     child.metadata_dict[rect_v_pos] = current_v
                     line_len_us.append(child.metadata_dict[rect_v_len])
                     
-                    current_u += (child.metadata_dict[rect_u_len] + (2*margin))
+                    current_u += (child.metadata_dict[rect_u_len] + (2*margin) + (2*extra_margin))
                     max_line_len_u = max(line_len_us)
                     
-                    max_len_u = max(max_len_u, (current_u + margin + padding))
-                    max_len_v = max(max_len_v, (current_v + max_line_len_u + margin + padding))
+                    max_len_u = max(max_len_u, (current_u))# + margin + padding + extra_margin))
+                    max_len_v = max(max_len_v, (current_v + max_line_len_u + margin + padding + extra_margin))
+
+                    last_u = current_u
+                    last_v = current_v
                     
+                    highway_map["addresses"][child.path] = {addr_pos[0]: f"M {obj.path} {main_road_index}", addr_pos[1]:f"M {obj.path} {main_road_index+1}", "allocarions": {cr.Dir.LEFT:[], cr.Dir.RIGHT:[], cr.Dir.UP:[], cr.Dir.DOWN:[] }}
 
                     # print_with_indent(f"  child={child.name} pos=({child.metadata_dict[rect_u_pos]}, {child.metadata_dict[rect_v_pos]})", indent)
 
-                #temporary
+                # Save layout info inside the obj
                 obj.metadata_dict[rect_u_len] = max_len_u # Contains the inner components + internal margins and paddings
                 obj.metadata_dict[rect_v_len] = max_len_v # Contains the inner components + internal margins and paddings
                 obj.metadata_dict["title-font-family"] = style["title-font-family"]
                 obj.metadata_dict["title-font-size"] = style["title-font-size"]
 
+
+                # Add the last road
+                main_road_index += 1
+                road_name = f"M {obj.path} {main_road_index}"
+                # else: # Do not add title to architecture
+                if orientation == Orientation.LEFT_RIGHT:
+                    # current_u += title_height
+                    road_x = last_v + max_line_len_u
+                    road_y = 0
+                    road_w = padding + margin + extra_margin
+                    road_h = last_u
+                else:
+                    # current_v += title_height
+                    road_x = 0
+                    road_y = last_v + max_line_len_u
+                    road_w = last_u
+                    road_h = padding + margin + extra_margin
+                local_roads_map["rects"][road_name] = [int(road_x), int(road_y), int(road_w), int(road_h)]
+                local_roads_map["orientations"][road_name] = road_orientation
+                local_roads_map["allocations"][road_name] = []
+                
+                highway_map["final"].append(road_name) # List of final road keys, because index is not enougth
+
+                for key, road in local_roads_map["rects"].items():
+                    # Adjust w and h for all main roads
+                    if key[0] == "M":
+                        if orientation == Orientation.LEFT_RIGHT:
+                            road[3] = max_len_u
+                        else:
+                            road[2] = max_len_u
+
+                highway_map["roads"]["rects"].update(local_roads_map["rects"])
+                highway_map["roads"]["orientations"].update(local_roads_map["orientations"])
+                highway_map["roads"]["allocations"].update(local_roads_map["allocations"])
+
             else:
                 text_with = calculate_text_dim(obj.name, style["title-font-size"])
                 icon_space = calculate_icon_space(obj, style)
-                print_html_comment_indent(f"text_with: {text_with} for {obj.name}")
+                # print_html_comment_indent(f"text_with: {text_with} for {obj.name}")
 
+                # Save layout info inside the obj
                 # If there are no children, the rectangle keeps its minimal dimensions
                 obj.metadata_dict["rect_x_len"] = max(obj.metadata_dict["rect_min_x_len"], text_with + icon_space)
                 obj.metadata_dict["rect_y_len"] = obj.metadata_dict["rect_min_y_len"]
@@ -498,7 +620,9 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 
             # print_with_indent(f" {obj.name} dim=({obj.metadata_dict[rect_x_len]},{obj.metadata_dict[rect_y_len]})\n", indent)
 
-    def recurrent(obj, connections, indent):
+    def recurrent_draw(obj, connections, indent):
+        # Print all the svg commands to be embedded in html
+        
         path = ""
         
         for name, value in inspect.getmembers(obj):
@@ -512,7 +636,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                         if value.has_sub_objs():
                             print_with_indent(f'<g transform="translate({value.metadata_dict["rect_x_pos"]}, {value.metadata_dict["rect_y_pos"]})">', indent)
                             
-                    recurrent(value, connections, indent+1)
+                    recurrent_draw(value, connections, indent+1)
 
                     if isinstance(value, pt.PlantumlContainer):
                         if value.has_sub_objs():
@@ -523,20 +647,34 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     
     orientation = Orientation.LEFT_RIGHT
     #orientation = Orientation.TOP_DOWN
-    print('plantuml_arch.metadata_dict["orientation"] = ', plantuml_arch.metadata_dict["orientation"])
+    # print('plantuml_arch.metadata_dict["orientation"] = ', plantuml_arch.metadata_dict["orientation"])
     if "orientation" in plantuml_arch.metadata_dict and plantuml_arch.metadata_dict["orientation"] == "top to bottom direction":
         orientation = Orientation.TOP_DOWN
+        highway_map["orientation"] = orientation
         
-    recurrent_dim(plantuml_arch, style, orientation)
+    recurrent_layout_sizing(plantuml_arch, orientation)
+    
+    # Adjust the highway_map adding the absolute positions to the relative ones created by recurrent_layout_sizing
+    for key, road in highway_map["roads"]["rects"].items():
+        # print(f" Adding offset to {key}")
+        # Split the string into a list of words
+        words = key.split()
+        obj = plantuml_arch.find_sub_obj_by_path_recursive(words[1])
+        if obj != None:
+            # print(f"   Object found name {obj.name}")
+            offset_x, offset_y = cr.get_absolute_pos(plantuml_arch, obj)
+            if offset_x != None and offset_y != None:
+                road[0] += offset_x
+                road[1] += offset_y
+        # else:
+            # print(f"   ERROR: Object not found: path={words[0]}.")
+
+        
     comments = []
     get_all_comments(plantuml_arch, comments)
     top_comments, bottom_comments = split_top_bottom_comments(plantuml_arch, comments, plantuml_arch.metadata_dict["rect_x_len"], plantuml_arch.metadata_dict["rect_y_len"])
     top_comment_width, top_comment_height = calculate_comments_dim(top_comments)
     bottom_comment_width, bottom_comment_height = calculate_comments_dim(bottom_comments)
-
-    connections = {} # Use dictionary to avoid duplications
-    get_all_connections(plantuml_arch, connections)
-
     
     svg_height = plantuml_arch.metadata_dict["rect_y_len"] + top_comment_height + bottom_comment_height
     svg_width = max(plantuml_arch.metadata_dict["rect_x_len"], top_comment_width, bottom_comment_width)
@@ -544,6 +682,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     # print("\nSVG\n-------------------------------------------------------------------------------\n")
     
     print(f'    <svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">')
+
     print(r"""
         <!-- Define gradients and filters for the shadow effect -->
         <defs>
@@ -567,7 +706,17 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     """)
 
     print_with_indent(f'<g transform="translate(0, {top_comment_height})">', 2)
-    recurrent(plantuml_arch, connections, 3)
+    
+    connections = {} # Use dictionary to avoid duplications
+    get_all_connections(plantuml_arch, connections, highway_map)
+
+    print_svg_component(plantuml_arch.name, plantuml_arch, 2)
+    recurrent_draw(plantuml_arch, connections, 3)
+
+    # # print all roads.
+    if kwargs.get("print_roads", False) == True:
+        for key, value in highway_map["roads"]["rects"].items():
+            print_svg_rect(key, value)
 
     # print all connections only in the end.
     for value in connections.values():

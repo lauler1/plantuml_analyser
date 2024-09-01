@@ -219,8 +219,15 @@ It can also be simulated.
         self.component6 = PlantumlComponent("PlantumlComponent 6")
         self.component6.state_activity = PlantumlActivity("State Machine")
         self.component6.state_activity.state_conn_1 = None
-        self.component6.state_activity2 = PlantumlActivity("This is a very long name to fit inside a component with some reduced size, just to see how it works", note=r"This is a note\nfor an ver long activity")
+        self.component6.state_activity2 = PlantumlActivity("This is a very long name to fit inside a component", note=r"This is a note\nfor an ver long activity")
         self.component6.state_activity.replace_run_method(state_machine_run)
+
+        self.brk2 = ArchBreakLine()
+        self.component7 = PlantumlComponent()
+        self.component7.activity = PlantumlActivity()
+        self.component8 = PlantumlComponent()
+        self.component9 = PlantumlComponent()
+
         
         # # Create some invisible plantuml connections to try to fix components in relative positions
         # self.layout_combine_vertical = [(self.component2, self.component6)]
@@ -232,6 +239,8 @@ It can also be simulated.
         self.conn1 = PlantumlConnection("Conn 1", self.actor1.actor_activity, self.component1.activity1) # , hide=True)
         self.conn2 = PlantumlConnection("Conn 2", self.component1.activity1, self.component2.activity1)
         self.conn3 = PlantumlConnection("Conn 3", self.actor1, self.component1.subcomp)
+
+        self.conn3b = PlantumlConnection("Conn 3B", self.class_activity, self.component6.state_activity2)
 
         self.sm_conn = PlantumlConnection("SM Conn", [self.class_activity, self.component1.activity2], self.component6.state_activity)
         self.mlt_conn = PlantumlConnection("Multiple Conn", self.component1.subcomp.activity2, [self.class_activity, self.component1.activity1])
@@ -256,6 +265,9 @@ It can also be simulated.
         self.frame2.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
         self.frame2.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3")
         self.conn4 = PlantumlConnection("Conn 4", self.frame2.component_super_arch1, self.frame2.component_super_arch2)
+
+        self.conn5 = PlantumlConnection("Conn 5", self.frame2.component_super_arch1.activity1, self.frame.sub_architecture.component2.activity1)
+        self.conn6 = PlantumlConnection("Conn 6", self.frame.sub_architecture.component7.activity, self.frame.sub_architecture.component2.activity1)
 
         # # Create some invisible plantuml connections to try to fix components in relative positions
         # self.layout_combine_vertical = [(self.group1.component_super_arch1, self.frame), (self.frame, self.group1.component_super_arch2)]
@@ -289,7 +301,7 @@ def case6(mysim):
 @redirect_svg_output_to_html('output/svg_arch.html', "Architecture Simulation with SVG", "This is the description of this SVG simulation<br> It may contain multiple lines")
 def case7(myarch):
     # Example with PlantumlArchitecture simulate
-    do_svg_architecture(myarch)
+    do_svg_architecture(myarch, print_roads=True)
 
 # myarch.frame.set_options(hide=True) 
 case7(myarch) 

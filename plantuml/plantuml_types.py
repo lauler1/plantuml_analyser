@@ -184,7 +184,30 @@ class PlantumlType:
                     return result
         return result
         
+    def find_sub_obj_by_path_recursive(self, path):
+        # Goes recursive to find object
+        result = None
+        for key, value in self.__dict__.items():
+            if isinstance(value, PlantumlType) and value.path == path:
+                # print (f"  Found obj '{path}' at instance level")
+                return value
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.find_sub_obj_by_path_recursive(path)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        for key, value in vars(self.__class__).items():
+            if isinstance(value, PlantumlType) and value.path == path:
+                # print (f"  Found obj '{path}' at class level")
+                return value
+            elif isinstance(value, PlantumlType) and not isinstance(value, PlantumlConnection):
+                result = value.find_sub_obj_by_path_recursive(path)
+                if result != None and isinstance(value, PlantumlType):
+                    return result
+        # print (f"Obj '{path}' not found")
+        return None
+
     def find_sub_obj_by_name_recursive(self, name):
+        # Goes recursive to find object
         result = None
         for key, value in self.__dict__.items():
             if isinstance(value, PlantumlType) and value.name == name:
@@ -206,6 +229,7 @@ class PlantumlType:
         return None
 
     def get_sub_obj_by_name(self, name):
+        # Does not go recursive
         for key, value in self.__dict__.items():
             if isinstance(value, PlantumlType) and value.name == name:
                 # print (f"  Found obj '{name}' at instance level")
@@ -406,8 +430,8 @@ class PlantumlArchitecture(PlantumlContainer):
         super().__init__(name)
         self.type = "Architecture"
         self.metadata_dict["layout_connectors"] = [] # Connections used to force placing components next other
-        #self.metadata_dict["orientation"] = "left to right direction"
-        self.metadata_dict["orientation"] = "top to bottom direction"
+        self.metadata_dict["orientation"] = "left to right direction"
+        # self.metadata_dict["orientation"] = "top to bottom direction" # this is the orientation of plantuml arrows
         self.metadata_dict["skinparam"] = """
 skinparam note{
   BackgroundColor #FFFFCB

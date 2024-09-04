@@ -50,7 +50,10 @@ def print_plant_component(name, plantuml_obj, indent=0):
 def create_plant_comonnection(name, plantuml_obj, indent=0):
     color = ""
     if "color" in plantuml_obj.metadata_dict:
-        color = "#"+plantuml_obj.metadata_dict["color"]
+        if plantuml_obj.metadata_dict["color"].startswith("#"):
+            color = plantuml_obj.metadata_dict["color"]
+        else:
+            color = "#"+plantuml_obj.metadata_dict["color"]
     
     line = "-[norank]-"
     if "line" in plantuml_obj.metadata_dict:

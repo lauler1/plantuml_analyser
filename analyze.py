@@ -266,7 +266,7 @@ It can also be simulated.
         self.frame2.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3")
         self.conn4 = PlantumlConnection("Conn 4", self.frame2.component_super_arch1, self.frame2.component_super_arch2)
 
-        self.conn5 = PlantumlConnection("Conn 5", self.frame2.component_super_arch1.activity1, self.frame.sub_architecture.component2.activity1)
+        self.conn5 = PlantumlConnection("Conn 5", self.frame2.component_super_arch1.activity1, self.frame.sub_architecture.component2.activity1, color="red")
         self.conn6 = PlantumlConnection("Conn 6", self.frame.sub_architecture.component7.activity, self.frame.sub_architecture.component2.activity1)
 
         # # Create some invisible plantuml connections to try to fix components in relative positions
@@ -301,7 +301,7 @@ def case6(mysim):
 @redirect_svg_output_to_html('output/svg_arch.html', "Architecture Simulation with SVG", "This is the description of this SVG simulation<br> It may contain multiple lines")
 def case7(myarch):
     # Example with PlantumlArchitecture simulate
-    do_svg_architecture(myarch, print_roads=True)
+    do_svg_architecture(myarch, print_roads=False)
 
 # myarch.frame.set_options(hide=True) 
 case7(myarch) 

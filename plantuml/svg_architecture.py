@@ -5,6 +5,7 @@ import io
 from pprint import pprint
 import plantuml.plantuml_types as pt
 import plantuml.connection_routing as cr
+import plantuml.common as c
 import inspect
 import math
 from enum import Enum
@@ -13,14 +14,15 @@ class Orientation(Enum):
     LEFT_RIGHT = 0
     TOP_DOWN = 1
     
-default_style = { \
-
-         "root_margin":20, # Extra separation space outside the rectangle border of the root architeture\
-         "margin":15, # Separation space outside the rectangle border of a component\
-         "padding":10, # Separation space inside the rectangle border of a component\
-         "title-height": 25,\
-         "title-font-family":"Consolas",\
-         "title-font-size":15
+default_layout_style = { 
+         "root_margin":20, # Extra separation space outside the rectangle border of the root architeture
+         "margin":15, # Separation space outside the rectangle border of a component
+         "padding":10, # Separation space inside the rectangle border of a component
+         "title-height": 25,
+         "title-font-family":"Consolas",
+         "title-font-size":15,
+         "connection-font-family":"Consolas", ##"Courier New",
+         "connection-font-size":12,
          }
 
 def print_with_indent(text, indent = 0):
@@ -29,7 +31,7 @@ def print_with_indent(text, indent = 0):
 def print_html_comment_indent(text, indent = 0):
     print('    ' * indent + "<!--", text, "-->")
 
-def calculate_icon_space(obj, style):
+def calculate_icon_space(obj, layout_style):
     return 50 # TODO: Improve this
 
 def calculate_text_dim(text, font_size=15, font_weight="normal"):
@@ -74,11 +76,9 @@ def print_svg_comment(text_lines, x, y, width, height, line_to_x, line_to_y, tit
         fold.append((x+ width - fold_size, y))
         fold.append((x+ width, y + fold_size))
         fold.append((x+ width - fold_size, y + fold_size))
+        
 
         print_with_indent(f'<line x1="{x+width/2}" y1="{y+height/2}" x2="{line_to_x}" y2="{line_to_y}" stroke="black" stroke-width="1" stroke-dasharray="2, 2" />', indent)
-
-        # print_with_indent(f'<rect x="{x}" y="{y}" width="{width+10}" height="{height+20}"  fill="lightyellow" stroke="black" stroke-width="1"/>', indent)
-
 
         #Folded corner
         print_with_indent(f'<polygon points="{main_fold[0][0]},{main_fold[0][1]} {main_fold[1][0]},{main_fold[1][1]} {main_fold[2][0]},{main_fold[2][1]} {main_fold[3][0]},{main_fold[3][1]} {main_fold[4][0]},{main_fold[4][1]}" fill="#FFFFCB" stroke="#FFCC66" stroke-width="1"/>', indent)
@@ -90,146 +90,7 @@ def print_svg_comment(text_lines, x, y, width, height, line_to_x, line_to_y, tit
         for index, line in enumerate(text_lines):
             print_with_indent(f'<text x="{x+5}" y="{y+20+(title_font_size*index)}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{line}</text>', indent)
 
-def draw_single_connection(name, pos1, pos2, style, indent=0):
-    return f'<line x1="{pos1[0]}" y1="{pos1[1]}" x2="{pos2[0]}" y2="{pos2[1]}" stroke="{style["color"]}" stroke-width="1" />'
-
-def predict_single_connection(arch, obj1, obj2):
-    def normalize_vector(v):
-        magnitude = math.sqrt(v[0]**2 + v[1]**2)
-        if magnitude == 0:
-            return (0, 0)
-        return (v[0] / magnitude, v[1] / magnitude)
-
-    if not isinstance(obj1, pt.PlantumlType) or not isinstance(obj2, pt.PlantumlType):
-        return (0, 0)
-    x1, y1 = cr.get_absolute_center(arch, obj1)
-    x2, y2 = cr.get_absolute_center(arch, obj2)
-    
-    return normalize_vector((x2-x1, y2-y1))
-
-def calc_bord_pos(arch, obj, comp1_vec):
-    # print_html_comment_indent(f"  calc_bord_pos obj name = {obj.name}")
-    
-    x, y = cr.get_absolute_pos(arch, obj)
-    # x = obj.metadata_dict["rect_x_pos"]
-    # y = obj.metadata_dict["rect_y_pos"]
-    width = obj.metadata_dict["rect_x_len"]
-    height = obj.metadata_dict["rect_y_len"]
-    
-    res = cr.find_rect_border_intersection(x, y, width, height, comp1_vec[0], comp1_vec[1])
-    # print_html_comment_indent(f"   calc_bord_pos res = {res}")
-    return res
-
-def create_svg_comonnection(arch, name, plantuml_obj, indent=0):
-    def is_hexadecimal(s):
-        # Return True if the string represents a hexa value
-        try:
-            print ("OK")
-            int(s, 16)
-            return True
-        except ValueError:
-            print ("EXCEPTION")
-            return False
-    def invert_vec(v):
-        # Invert the signal of the items of the vector
-        x = -v[0]
-        y = -v[1]
-        return (x,y)
-    def average_vec(vec_list):
-        # Return a vector (normalized) representing the average of the list of vectors
-        x = 0
-        y = 0
-        for idx, v in enumerate(vec_list):
-            # print_html_comment_indent(f"   average_vec ({v[0]}, {v[1]})")
-            x += v[0]
-            y += v[1]
-        
-        magnitude = math.sqrt(x**2 + y**2)
-        if magnitude == 0:
-            return (0, 0)
-        # print_html_comment_indent(f"   average_vec ret ({x / magnitude}, {y / magnitude})")
-        return (x / magnitude, y / magnitude)
-        
-    style = {"color":"black"} # Provision for ... TBD
-    # color = ""
-    if "color" in plantuml_obj.metadata_dict:
-        color_str = plantuml_obj.metadata_dict["color"]
-        if is_hexadecimal(color_str):
-            style["color"] = "#"+color_str
-        else:
-            style["color"] = color_str
-    
-    # line = "-[norank]-"
-    # if "line" in plantuml_obj.metadata_dict:
-        # line = plantuml_obj.metadata_dict["line"]
-    # elif plantuml_obj.metadata_dict["direction"] == "out":
-        # line = "-[norank]->"
-    # elif plantuml_obj.metadata_dict["direction"] == "in":
-        # line = "<-[norank]-"
-
-    # First create an approximation of direction by getting the average of the multiple center-2-center lines
-    comp1_vec = []
-    comp2_vec = []
-    if isinstance(plantuml_obj.comp1, list):
-        # print_html_comment_indent(f"Case 1 (multiples to one)")
-        comp2 = plantuml_obj.comp2.ref
-        for item in plantuml_obj.comp1:
-            comp1 = item.ref
-            # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
-            comp1_vec.append(predict_single_connection(arch, comp1, comp2))
-        # print_html_comment_indent(f"   comp1_vec {comp1_vec}")
-        comp2_vec.append(invert_vec(average_vec(comp1_vec)))
-        # print_html_comment_indent(f"   comp1_vec = {comp1_vec} comp2_vec = {comp2_vec[0]}")
-    elif isinstance(plantuml_obj.comp2, list):
-        # print_html_comment_indent(f"Case 2 (one to multiples)")
-        comp1 = plantuml_obj.comp1.ref
-        for item in plantuml_obj.comp2:
-            comp2 = item.ref
-            # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
-            comp2_vec.append(invert_vec(predict_single_connection(arch, comp1, comp2)))
-            # print_html_comment_indent(f"   before comp1_vec {predict_single_connection(arch, comp1, comp2)}")
-        comp1_vec.append(invert_vec(average_vec(comp2_vec))) # Invert again because 1 should use 2 not inverted
-        # print_html_comment_indent(f"   comp1_vec = {comp1_vec[0]} comp2_vec = {comp2_vec}")
-    else:
-        # print_html_comment_indent(f"Case 3 (one to one)")
-        comp2 = plantuml_obj.comp1.ref
-        comp1 = plantuml_obj.comp2.ref
-        # conn_vec_comp.append(predict_single_connection(arch, comp1, comp2))
-        comp1_vec.append(predict_single_connection(arch, comp1, comp2))
-        comp2_vec.append(invert_vec(comp1_vec[0]))
-        # print_html_comment_indent(f"  case 3 {comp1.name} vec1=({comp1_vec[0][0]},{comp1_vec[0][1]}); {comp2.name} vec2=({comp2_vec[0][0]},{comp2_vec[0][1]})")
-
-    conn_str = ""
-    if isinstance(plantuml_obj.comp1, list):
-        # print_html_comment_indent(f"Case 1")
-        comp2 = plantuml_obj.comp2.ref
-        pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
-        for index, item in enumerate(plantuml_obj.comp1):
-            comp1 = item.ref
-            if comp1.is_visible_recursive(arch) and comp2.is_visible_recursive(arch):
-                pos1 = calc_bord_pos(arch, comp1, comp1_vec[index])
-                conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
-        
-    elif isinstance(plantuml_obj.comp2, list):
-        comp1 = plantuml_obj.comp1.ref
-        pos1 = calc_bord_pos(arch, comp1, comp1_vec[0])
-        for index, item in enumerate(plantuml_obj.comp2):
-            # print(f" Case 2 {index}")
-            comp2 = item.ref
-            if comp1.is_visible_recursive(arch) and comp2.is_visible_recursive(arch):
-                pos2 = calc_bord_pos(arch, comp2, comp2_vec[index])
-                conn_str += draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}\n"
-    else:
-        # print_html_comment_indent(f"Case 3")
-        comp1 = plantuml_obj.comp2.ref
-        comp2 = plantuml_obj.comp1.ref
-        if comp1.is_visible_recursive(arch) and comp2.is_visible_recursive(arch):
-            pos1 = calc_bord_pos(arch, comp1, comp1_vec[0])
-            pos2 = calc_bord_pos(arch, comp2, comp2_vec[0])
-            conn_str = draw_single_connection(name, pos1, pos2, style, indent) #f"{path1} {line} {path2} {color} : {name}"
-    return {name:conn_str}
-
-def get_all_connections(arch, connections, highway_map):
+def get_all_connections(arch, connections, highway_map, layout_style: dict):
     
     def get_all_connections_recurrent(arch, obj, connections):
         if isinstance(obj, pt.PlantumlContainer):
@@ -237,8 +98,7 @@ def get_all_connections(arch, connections, highway_map):
                 if isinstance(value, pt.PlantumlConnection):
                     if value.is_visible():
                         # Add this connection to the connections dictionary
-                        # connections.update(create_svg_comonnection(arch, value.name, value)) # Old method
-                        connections.update(cr.route_svg_comonnection(arch, value.name, value, highway_map)) # New Method
+                        connections.update(cr.route_svg_comonnection(arch, value.name, value, highway_map, layout_style)) # New Method
                         
 
                 elif isinstance(value, pt.PlantumlType):
@@ -320,58 +180,79 @@ def calculate_comments_dim(comments, margin=50):
         
     return comment_width, comment_height
 
-def print_svg_component(name, obj, indent=0):
-    x = cr.get_obj_prop(obj, "rect_x_pos")
-    y = cr.get_obj_prop(obj, "rect_y_pos")
-    width = cr.get_obj_prop(obj, "rect_x_len", 50)
-    height = cr.get_obj_prop(obj, "rect_y_len", 50)
-    # x = obj.metadata_dict["rect_x_pos"]
-    # y = obj.metadata_dict["rect_y_pos"]
-    # width = obj.metadata_dict["rect_x_len"]
-    # height = obj.metadata_dict["rect_y_len"]
+
+def print_svg_component(name, obj, layout_style, indent=0):
+    x = c.get_obj_prop(obj, "rect_x_pos")
+    y = c.get_obj_prop(obj, "rect_y_pos")
+    width = c.get_obj_prop(obj, "rect_x_len", 50)
+    height = c.get_obj_prop(obj, "rect_y_len", 50)
+
     text_length = width
     
-    title_font_family = cr.get_obj_prop(obj, "title-font-family", "Consolas")
-    title_font_size = cr.get_obj_prop(obj, "title-font-size", "15px")
+    # BackgroundColor #C5FFA6
+    # BorderColor #145B17
+    # FontColor #085D24
+  
+    # Get fonts from layout_style
+    title_height      = layout_style.get("title-height", 25)
+    title_font_family = layout_style.get("title-font-family", "Consolas")
+    title_font_size   = layout_style.get("title-font-size", 15)
     
-  # BackgroundColor #C5FFA6
-  # BorderColor #145B17
-  # FontColor #085D24
+    # Replace if customized layout style in the componnent
+    title_height      = c.get_obj_prop(obj, "title_height", title_height)
+    title_font_family = c.get_obj_prop(obj, "title_font_family", title_font_family)
+    title_font_size   = c.get_obj_prop(obj, "title_font_size", title_font_size)
+    
+    # Get colors from component
+    fill, stroke, stroke_width, font_weight, text_color = c.get_default_color_style(obj.type)
+    fill, stroke, stroke_width, font_weight, text_color = c.get_color_style(obj, fill, stroke, stroke_width, font_weight, text_color)
+    
 
-    # print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" style="fill: none; stroke: red; stroke-width: 2px;"/>', indent)
     if isinstance(obj, pt.PlantumlActivity):
-        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}"  fill="#C5FFA6" stroke="#145B17" stroke-width="1"/>', indent)
+        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}"/>', indent)
 
         print_with_indent(f'<rect x="{x+10}" y="{y+10}" width="20" height="18" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<rect x="{x+6}" y="{y+12}" width="6" height="4" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<rect x="{x+6}" y="{y+20}" width="6" height="4" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<text x="{x+20}" y="{y+24}" font-family="Arial" font-size="14px" font-weight="bold" text-anchor="middle" fill="black">A</text>', indent)
 
-        print_with_indent(f'<text x="{x+50}" y="{y+25}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold" fill=#085D24>{name}</text>', indent)
+        print_with_indent(f'<foreignObject x="{x+50}" y="{y+10}" width="{width-50}" height="{height - 10}">', indent)
+        print_with_indent(f'<div xmlns="http://www.w3.org/1999/xhtml" style="font-family: {title_font_family}; font-size: {title_font_size}px; color: {text_color}; font-weight: {font_weight};">{name}</div>', indent+1)
+        print_with_indent(f'</foreignObject>', indent)
 
     elif isinstance(obj, pt.PlantumlActor):
-        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}"  fill="url(#grad2)" stroke="#145B17" stroke-width="1" filter="url(#shadow)"/>', indent)
+        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}" filter="url(#shadow)"/>', indent)
 
         print_with_indent(f'<rect x="{x+10}" y="{y+10}" width="20" height="18" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<rect x="{x+6}" y="{y+12}" width="6" height="4" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<rect x="{x+6}" y="{y+20}" width="6" height="4" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<text x="{x+21}" y="{y+24}" font-family="Arial" font-size="12px" font-weight="bold" text-anchor="middle" fill="black">LA</text>', indent)
 
-        print_with_indent(f'<text x="{x+50}" y="{y+25}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{name}</text>', indent)
-        
+        print_with_indent(f'<foreignObject x="{x+50}" y="{y+10}" width="{width-50}" height="{height - 10}">', indent)
+        print_with_indent(f'<div xmlns="http://www.w3.org/1999/xhtml" style="font-family: {title_font_family}; font-size: {title_font_size}px; color: {text_color}; font-weight: {font_weight};">{name}</div>', indent+1)
+        print_with_indent(f'</foreignObject>', indent)
+
     elif isinstance(obj, pt.PlantumlComponent):
-        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}"  fill="url(#grad1)" stroke="#4E4E97" stroke-width="1" filter="url(#shadow)"/>', indent)
+        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}" filter="url(#shadow)"/>', indent)
 
         print_with_indent(f'<rect x="{x+10}" y="{y+10}" width="20" height="18" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<rect x="{x+6}" y="{y+12}" width="6" height="4" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<rect x="{x+6}" y="{y+20}" width="6" height="4" fill="white" stroke="black" stroke-width="1"/>', indent)
         print_with_indent(f'<text x="{x+20}" y="{y+24}" font-family="Arial" font-size="14px" font-weight="bold" text-anchor="middle" fill="black">L</text>', indent)
 
-        print_with_indent(f'<text x="{x+50}" y="{y+25}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{name}</text>', indent)
-        
+        print_with_indent(f'<foreignObject x="{x+50}" y="{y+10}" width="{width-50}" height="{height - 10}">', indent)
+        print_with_indent(f'<div xmlns="http://www.w3.org/1999/xhtml" style="font-family: {title_font_family}; font-size: {title_font_size}px; color: {text_color}; font-weight: {font_weight};">{name}</div>', indent+1)
+        print_with_indent(f'</foreignObject>', indent)
+
+    elif isinstance(obj, pt.PlantumlGroup):
+        pass # Groups have nothing
     else:
-        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" style="fill: none; stroke: black; stroke-width: 1px;" stroke-dasharray="2, 2"/>', indent)
-        print_with_indent(f'<text x="{x+5}" y="{y+20}" font-family="{title_font_family}" font-size="{title_font_size}px" font-weight="bold">{name}</text>', indent)
+        print_with_indent(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="2, 2"/>', indent)
+        
+        print_with_indent(f'<foreignObject x="{x+50}" y="{y+10}" width="{width-50}" height="{height - 10}">', indent)
+        print_with_indent(f'<div xmlns="http://www.w3.org/1999/xhtml" style="font-family: {title_font_family}; font-size: {title_font_size}px; color: {text_color}; font-weight: {font_weight};">{name}</div>', indent+1)
+        print_with_indent(f'</foreignObject>', indent)
+
 
 def print_svg_rect(name: str, rect: list[int|float, int|float, int|float, int|float], color: str = "red", fill: str ="gray", fill_opacity: str="0.2"):
     """
@@ -384,7 +265,7 @@ def print_svg_rect(name: str, rect: list[int|float, int|float, int|float, int|fl
     print_with_indent(f'<rect x="{rect[0]}" y="{rect[1]}" width="{rect[2]}" height="{rect[3]}" fill="{fill}" stroke="{color}" stroke-width="1" fill-opacity="{fill_opacity}"/>')
     print_with_indent(f'<text x="{rect[0]+5}" y="{rect[1]+10}" font-family="Consolas" font-size="15px", fill="{color}" >{name}</text>')
     
-def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
+def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwargs):
     """
     This function creates a simple svg layout output representation of the architecture.
     
@@ -400,7 +281,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
 
     Argumnets:
         plantuml_arch: A class of a PlantumlType type.
-        style: The style dictionary (E.g. pading, colors, fonts) expected for this layout.
+        layout_style: The layout style dictionary (E.g. pading, margin, fonts) expected for the dimensioning the layout.
         kwargs: Optional key/value arguments (TBD).
     """
     
@@ -418,7 +299,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
         # Creates the layout retangles of the architecture.
         # All coordinates are relative to the parent component.
         # To get an absolute coordinates use get_absolute_pos or get_absolute_center from plantuml.connection_routing.
-        # style and highway_map are accessed using closure principle (captured from the parent function)
+        # layout_style and highway_map are accessed using closure principle (captured from the parent function)
         #
         # Chenged coordination names due to the dual orientation possibilities inside the subcomponents loop.
         #   Originally it used variables x and y, but they were good for one orientation only.
@@ -467,16 +348,16 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                         continue
                     recurrent_layout_sizing(child, orientation, indent+1)
                 
-                margin = cr.get_obj_prop(obj, 'margin', style['margin'])
-                padding = cr.get_obj_prop(obj, 'padding', style['padding'])
-                title_height = cr.get_obj_prop(obj, 'title-height', style['title-height'])
+                margin = c.get_obj_prop(obj, 'margin', layout_style['margin'])
+                padding = c.get_obj_prop(obj, 'padding', layout_style['padding'])
+                title_height = c.get_obj_prop(obj, 'title-height', layout_style['title-height'])
                 
                 current_u = 0
                 current_v = 0
                 
                 extra_margin = 0
                 if obj == plantuml_arch: # The root architecture has extra margins for connections
-                    extra_margin = style["root_margin"]
+                    extra_margin = layout_style["root_margin"]
                     # print_with_indent(f" ----------------> plantuml_arch={obj}", indent)
 
                 current_u += margin + padding + extra_margin
@@ -501,7 +382,6 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 line_len_us = []
                 max_line_len_u = 0
                 
-                
                 # highway_map - The main roads follow the main orientation of the layout
                 # Create first main road (Up or Left, depending on the orientation)
                 main_road_index = 0
@@ -513,8 +393,8 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 local_roads_map["orientations"][road_name] = road_orientation
                 local_roads_map["allocations"][road_name] = []
 
-                text_with = calculate_text_dim(obj.name, style["title-font-size"])
-                icon_space = calculate_icon_space(obj, style)
+                text_with = calculate_text_dim(obj.name, layout_style["title-font-size"])
+                icon_space = calculate_icon_space(obj, layout_style)
                 # print_html_comment_indent(f"text_with: {text_with} for {obj.name}")               
                 max_len_u  = max(obj.metadata_dict[rect_min_u_len], text_with + icon_space, (2*margin) + (2*padding) + (2*extra_margin))
                 max_len_v = max(obj.metadata_dict[rect_min_v_len], (2*margin) + (2*padding) + (2*extra_margin) + title_height)
@@ -548,7 +428,6 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
 
                         line_len_us = []
                         max_line_len_u = 0
-
                 
                     if not isinstance(child, pt.PlantumlType) or isinstance(child, pt.PlantumlConnection):
                         continue
@@ -570,13 +449,11 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                     
                     highway_map["addresses"][child.path] = {addr_pos[0]: f"M {obj.path} {main_road_index}", addr_pos[1]:f"M {obj.path} {main_road_index+1}", "allocarions": {cr.Dir.LEFT:[], cr.Dir.RIGHT:[], cr.Dir.UP:[], cr.Dir.DOWN:[] }}
 
-                    # print_with_indent(f"  child={child.name} pos=({child.metadata_dict[rect_u_pos]}, {child.metadata_dict[rect_v_pos]})", indent)
-
                 # Save layout info inside the obj
                 obj.metadata_dict[rect_u_len] = max_len_u # Contains the inner components + internal margins and paddings
                 obj.metadata_dict[rect_v_len] = max_len_v # Contains the inner components + internal margins and paddings
-                obj.metadata_dict["title-font-family"] = style["title-font-family"]
-                obj.metadata_dict["title-font-size"] = style["title-font-size"]
+                obj.metadata_dict["title-font-family"] = layout_style["title-font-family"]
+                obj.metadata_dict["title-font-size"] = layout_style["title-font-size"]
 
 
                 # Add the last road
@@ -614,19 +491,17 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
                 highway_map["roads"]["allocations"].update(local_roads_map["allocations"])
 
             else:
-                text_with = calculate_text_dim(obj.name, style["title-font-size"])
-                icon_space = calculate_icon_space(obj, style)
+                text_with = calculate_text_dim(obj.name, layout_style["title-font-size"])
+                icon_space = calculate_icon_space(obj, layout_style)
                 # print_html_comment_indent(f"text_with: {text_with} for {obj.name}")
 
                 # Save layout info inside the obj
                 # If there are no children, the rectangle keeps its minimal dimensions
                 obj.metadata_dict["rect_x_len"] = max(obj.metadata_dict["rect_min_x_len"], text_with + icon_space)
                 obj.metadata_dict["rect_y_len"] = obj.metadata_dict["rect_min_y_len"]
-                obj.metadata_dict["title-font-family"] = style["title-font-family"]
-                obj.metadata_dict["title-font-size"] = style["title-font-size"]
+                obj.metadata_dict["title-font-family"] = layout_style["title-font-family"]
+                obj.metadata_dict["title-font-size"] = layout_style["title-font-size"]
                 
-            # print_with_indent(f" {obj.name} dim=({obj.metadata_dict[rect_x_len]},{obj.metadata_dict[rect_y_len]})\n", indent)
-
     def recurrent_draw(obj, connections, indent):
         # Print all the svg commands to be embedded in html
         
@@ -636,7 +511,7 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
             if not inspect.isroutine(value) and not name.startswith('__'):
 
                 if isinstance(value, pt.PlantumlType) and not isinstance(value, pt.PlantumlConnection) and value.metadata_dict['hide'] == False:# and is_container(value):
-                    print_svg_component(value.name, value, indent)
+                    print_svg_component(value.name, value, layout_style, indent)
 
                     # TODO: Consider replace this list by some attribute 'is_container' or isinstance pt.PlantumlContainer
                     if isinstance(value, pt.PlantumlContainer):
@@ -673,9 +548,6 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
             if offset_x != None and offset_y != None:
                 road[0] += offset_x
                 road[1] += offset_y
-        # else:
-            # print(f"   ERROR: Object not found: path={words[0]}.")
-
         
     comments = []
     get_all_comments(plantuml_arch, comments)
@@ -693,11 +565,11 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     print(r"""
         <!-- Define gradients and filters for the shadow effect -->
         <defs>
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient id="grad_component" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style="stop-color:#C2E5FE;stop-opacity:1" />
                 <stop offset="100%" style="stop-color:#96B1DA;stop-opacity:1" />
             </linearGradient>
-            <linearGradient id="grad2" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient id="grad_actor" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style="stop-color:#D9FCFF;stop-opacity:1" />
                 <stop offset="100%" style="stop-color:#C6E6FF;stop-opacity:1" />
             </linearGradient>
@@ -715,9 +587,9 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
     print_with_indent(f'<g transform="translate(0, {top_comment_height})">', 2)
     
     connections = {} # Use dictionary to avoid duplications
-    get_all_connections(plantuml_arch, connections, highway_map)
+    get_all_connections(plantuml_arch, connections, highway_map, layout_style)
 
-    print_svg_component(plantuml_arch.name, plantuml_arch, 2)
+    print_svg_component(plantuml_arch.name, plantuml_arch, layout_style, 2)
     recurrent_draw(plantuml_arch, connections, 3)
 
     # # print all roads.
@@ -733,10 +605,10 @@ def do_svg_architecture(plantuml_arch, style=default_style, **kwargs):
 
     for comment in top_comments:
         print_html_comment_indent(f"top {comment[1].name}: {comment[0]}, center = ({comment[6]},{comment[7]})")
-        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5] + top_comment_height - cr.get_obj_prop(comment[1], 'rect_y_len')/2)
+        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5] + top_comment_height - c.get_obj_prop(comment[1], 'rect_y_len')/2)
 
     for comment in bottom_comments:
         print_html_comment_indent(f"top {comment[1].name}: {comment[0]}, center = ({comment[6]},{comment[7]})")
-        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5]+ top_comment_height + cr.get_obj_prop(comment[1], 'rect_y_len')/2)
+        print_svg_comment(comment[0], comment[6], comment[7], comment[2], comment[3], comment[4], comment[5]+ top_comment_height + c.get_obj_prop(comment[1], 'rect_y_len')/2)
 
     print(f'    </svg>')

@@ -69,6 +69,11 @@ class PlantumlType:
             remove: Remove completely a component of drawing, e.g.: remove=True
             hide: Make a component invisible, but still occupining the place, e.g.: hide=True
             color: Define the colors of the component as plantuml syntax, e.g.: color="pink;line:red;line.bold;text:red"
+
+            title_height: SVG title height. Default 15.
+            title_font_family: Title font family. Default 'Consolas'.
+            title_font_size: Title font size. Default 25.
+
         """
         self.name = name
         self.type = "Type"
@@ -602,7 +607,7 @@ class PlantumlConnection(PlantumlType):
             
         """
         super().__init__(name, id)
-        self.type = "ArchView"
+        self.type = "Connection"
         
         self.metadata_dict["direction"] = "inout"
         # self.metadata_dict["line"] = "--"

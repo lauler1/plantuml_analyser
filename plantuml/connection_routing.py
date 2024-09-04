@@ -5,6 +5,7 @@ import io
 from pprint import pprint
 import plantuml.plantuml_types as pt
 import plantuml.connection_state_manager as csm
+import plantuml.common as c
 import inspect
 import math
 from enum import Enum
@@ -28,9 +29,7 @@ def opposit(dir: Dir):
         return Dir.DOWN
 
 DirType = csm.DirType
-# class DirType(Enum):
-    # HORIZONTAL = 0
-    # VERTICAL = 1
+
 
 def print_with_indent(text, indent = 0):
     print('    ' * indent + text)
@@ -40,14 +39,7 @@ def print_html_comment_indent(text, indent = 0):
 
 def print_obj_abs_pos_dim(arch: pt.PlantumlArchitecture, obj: pt.PlantumlType, indent = 0):
     x1, y1 = get_absolute_pos(arch, obj)
-    print_html_comment_indent(f'  {obj.name} ({x1}, {y1}) ({get_obj_prop(obj, "rect_x_len", None)}, {get_obj_prop(obj, "rect_y_len", None)})', indent)
-
-def get_obj_prop(obj, prop, default=0):
-    if isinstance(obj, pt.PlantumlType) and prop in obj.metadata_dict:
-        res = obj.metadata_dict[prop]
-        if res is not None:
-            return res
-    return default
+    print_html_comment_indent(f'  {obj.name} ({x1}, {y1}) ({c.get_obj_prop(obj, "rect_x_len", None)}, {c.get_obj_prop(obj, "rect_y_len", None)})', indent)
 
 def get_absolute_pos(arch, obj):
     """
@@ -58,17 +50,17 @@ def get_absolute_pos(arch, obj):
     abs_x = 0
     abs_y = 0
     for index, item in enumerate(owner_tree):
-        # print_html_comment_indent(f"{index}: {item.name}, pos=({get_obj_prop(item, 'rect_x_pos', 0)},{get_obj_prop(item, 'rect_y_pos', 0)})", 2)
+        # print_html_comment_indent(f"{index}: {item.name}, pos=({c.get_obj_prop(item, 'rect_x_pos', 0)},{c.get_obj_prop(item, 'rect_y_pos', 0)})", 2)
         #The last element will be assumed as 0, 0, not None, None
-        dx = get_obj_prop(item, 'rect_x_pos', 0)
-        dy = get_obj_prop(item, 'rect_y_pos', 0)
+        dx = c.get_obj_prop(item, 'rect_x_pos', 0)
+        dy = c.get_obj_prop(item, 'rect_y_pos', 0)
         if dx == None or dy == None:
             return None, None
         abs_x += dx
         abs_y += dy
     
-    dx = get_obj_prop(obj, 'rect_x_pos', None)
-    dy = get_obj_prop(obj, 'rect_y_pos', None)
+    dx = c.get_obj_prop(obj, 'rect_x_pos', None)
+    dy = c.get_obj_prop(obj, 'rect_y_pos', None)
     if dx == None or dy == None:
         return None, None
     abs_x += dx
@@ -81,8 +73,8 @@ def get_absolute_center(arch, obj):
     The coordination system starts (0, 0) at Top Left of the architecture and increases towards Right and Down.
     """
     abs_x, abs_y = get_absolute_pos(arch, obj)
-    dx = get_obj_prop(obj, 'rect_x_len', None)
-    dy = get_obj_prop(obj, 'rect_y_len', None)
+    dx = c.get_obj_prop(obj, 'rect_x_len', None)
+    dy = c.get_obj_prop(obj, 'rect_y_len', None)
     if abs_x == None or abs_y == None or dx == None or dy == None:
         return None, None
     abs_x += dx/2
@@ -96,8 +88,8 @@ def get_absolute_coordinates(arch, obj):
     The coordination system starts (0, 0) at Top Left of the architecture and increases towards Right and Down.
     """
     x1, y1 = get_absolute_pos(arch, obj)
-    dx = get_obj_prop(obj, "rect_x_len", None)
-    dy = get_obj_prop(obj, "rect_y_len", None)
+    dx = c.get_obj_prop(obj, "rect_x_len", None)
+    dy = c.get_obj_prop(obj, "rect_y_len", None)
 
     if x1 is not None and y1 is not None and dx is not None and dy is not None: 
         x2 = x1 + dx
@@ -213,10 +205,10 @@ def are_components_in_same_row(arch: pt.PlantumlArchitecture, comp1: pt.Plantuml
     
     res = False
     if y1 < y2:
-        if  (y1 + get_obj_prop(comp1, "rect_y_len")) >= y2:
+        if  (y1 + c.get_obj_prop(comp1, "rect_y_len")) >= y2:
             res = True
     else:
-        if  (y2 + get_obj_prop(comp2, "rect_y_len")) >= y1:
+        if  (y2 + c.get_obj_prop(comp2, "rect_y_len")) >= y1:
             res = True
 
     print_html_comment_indent(f"    {res}\t= are_components_in_same_row: {comp1} and {comp2}", indent);
@@ -238,10 +230,10 @@ def are_components_in_same_column(arch: pt.PlantumlArchitecture, comp1: pt.Plant
     
     res = False
     if x1 < x2:
-        if  (x1 + get_obj_prop(comp1, "rect_x_len")) >= x2:
+        if  (x1 + c.get_obj_prop(comp1, "rect_x_len")) >= x2:
             res = True
     else:
-        if  (x2 + get_obj_prop(comp2, "rect_x_len")) >= x1:
+        if  (x2 + c.get_obj_prop(comp2, "rect_x_len")) >= x1:
             res = True
 
     print_html_comment_indent(f"    {res}\t= are_components_in_same_column: {comp1} and {comp2}", indent);
@@ -259,8 +251,8 @@ def get_vertical_overlapping(arch: pt.PlantumlArchitecture, comp1: pt.PlantumlTy
     if are_components_in_same_row(arch, comp1, comp2, indent+1): # If they overlap
         L1_x1, L1_y1 = get_absolute_pos(arch, comp1)
         L2_x1, L2_y1 = get_absolute_pos(arch, comp2)
-        L1_y2 = L1_y1 + get_obj_prop(comp1, "rect_y_len")
-        L2_y2 = L2_y1 + get_obj_prop(comp2, "rect_y_len")
+        L1_y2 = L1_y1 + c.get_obj_prop(comp1, "rect_y_len")
+        L2_y2 = L2_y1 + c.get_obj_prop(comp2, "rect_y_len")
 
         # Calculate the start and end of the overlap
         overlap_y1 = max(L1_y1, L2_y1)
@@ -283,8 +275,8 @@ def get_horizontal_overlapping(arch: pt.PlantumlArchitecture, comp1: pt.Plantuml
     if are_components_in_same_column(arch, comp1, comp2, indent+1):
         L1_x1, L1_y1 = get_absolute_pos(arch, comp1)
         L2_x1, L2_y1 = get_absolute_pos(arch, comp2)
-        L1_x2 = L1_x1 + get_obj_prop(comp1, "rect_x_len")
-        L2_x2 = L2_x1 + get_obj_prop(comp2, "rect_x_len")
+        L1_x2 = L1_x1 + c.get_obj_prop(comp1, "rect_x_len")
+        L2_x2 = L2_x1 + c.get_obj_prop(comp2, "rect_x_len")
 
         # Calculate the start and end of the overlap
         overlap_x1 = max(L1_x1, L2_x1)
@@ -609,9 +601,9 @@ def get_next_component(arch: pt.PlantumlArchitecture, coord: tuple[int, int], di
     components = get_components_in_the_path(arch, coord, dir, component_type, indent+1)
     ref = 0
     if dir == Dir.RIGHT:
-        ref = get_obj_prop(arch, "rect_x_len", 0)
+        ref = c.get_obj_prop(arch, "rect_x_len", 0)
     elif dir == Dir.DOWN:
-        ref = get_obj_prop(arch, "rect_y_len", 0)
+        ref = c.get_obj_prop(arch, "rect_y_len", 0)
 
     for comp in components:
         x1, y1, x2, y2 = get_absolute_coordinates(arch, comp)
@@ -660,11 +652,11 @@ def get_distance_to_next_component(arch: pt.PlantumlArchitecture, coord: tuple[i
             res = y2 - coord[1]
     else:
         if dir == Dir.RIGHT:
-            res = get_obj_prop(arch, "rect_x_len", 0) - coord[0]
+            res = c.get_obj_prop(arch, "rect_x_len", 0) - coord[0]
         elif dir == Dir.LEFT:
             res = 0 - coord[0]
         elif dir == Dir.DOWN:
-            res = get_obj_prop(arch, "rect_y_len", 0) - coord[1]
+            res = c.get_obj_prop(arch, "rect_y_len", 0) - coord[1]
         else: #dir == Dir.UP:
             res = 0 - coord[1]
     
@@ -815,47 +807,9 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
     return: A dictionary entry with the connection poly line where the key is the name of the connection.
     """
 
-    def print_single_conn(x1, y1, x2, y2, text = ""):
-        # print_html_comment_indent(f"print_single_conn {type(x1)} {type(y1)} {type(x2)} {type(y2)}")
-        text_anchor = "start"
-        if x2 < x1:
-            text_anchor = "end"
-
-        if int(y2) > int(y1):
-            rotate = 90
-        elif int(y2) < int(y1):
-            rotate = -90
-        else:
-            rotate = 0
-
-
-        return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="blue" stroke-width="1" />\n \
-<text x="{x1+3}" y="{y1-3}" font-family="Courier New" font-size="12px" fill="blue" text-anchor="{text_anchor}" transform="rotate({rotate} {x1},{y1})">{text}</text>'
-
-    def print_poly_conn(points, text = ""):
-        # return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="blue" stroke-width="3" />'
-        # <text x="{x1}" y="{y1}" font-family="Courier New" font-size="20px" fill="blue" font-weight="bold">{text}</text>'
-
-        text_anchor = "start"
-        if points[1][0] < points[0][0]:
-            text_anchor = "end"
-        
-        rotate = 0
-        if points[1][1] > points[0][1]:
-            rotate = 90
-        elif points[1][1] < points[0][1]:
-            rotate = -90
-        
-        point_str_list = []
-        for point in points:
-            point_str_list.append(f"{point[0]},{point[1]}")
-        points_str = " ".join(point_str_list)
-        return f'<polyline points="{points_str}" fill="none" stroke="blue" stroke-width="1" />\n \
-<text x="{points[0][0] + 3}" y="{points[0][1] - 3}" font-family="Courier New" font-size="12px" fill="blue" transform="rotate({rotate} {points[0][0]},{points[0][1]})"  text-anchor="{text_anchor}" >{text}</text>'
-
     print_html_comment_indent(f"route_single_comonnection: {name} {comp1.name} {comp1.path}", indent) # false
     print_html_comment_indent(f"                           {name} {comp2.name} {comp2.path}", indent) # false
-    conn_str = ""
+    conn_points = []
 
     # if name != "Multiple Conn:0": # name != "Conn 3" and name != "Conn 5" and name != "Conn 6": # Turn others of for debugging
         # return {name:""}
@@ -900,7 +854,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
         if y != None:
             csm.allocate_the_border_offset(highway_map, comp2.path, opposit(dir), y) # also save this in the other comp
             csm.allocate_offroad_horizontal_lane(highway_map, [x1, y, x2, y]) # also save this as an offroad lane, it has no road
-            conn_str = print_single_conn(x1, y, x2, y, name)
+            conn_points = [(x1, y), (x2, y)]
             finished = True
 
     elif is_same_column:
@@ -922,7 +876,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
         if x != None:
             csm.allocate_the_border_offset(highway_map, comp2.path, opposit(dir), x) # also save this in the other comp
             csm.allocate_offroad_vertical_lane(highway_map, [x, y1, x, y2]) # also save this as an offroad lane, it has no road
-            conn_str = print_single_conn(x, y1, x, y2, name)
+            conn_points = [(x, y1), (x, y2)]
             finished = True
 
     # For simple test inverting direction of a connection (Only for debugging)
@@ -963,7 +917,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                         road_points = [(x, c1_y2), (x, y), (x2, y)]
 
                         csm.allocate_offroad_horizontal_lane(highway_map, [x ,y ,x2 ,y]) # also save this as an offroad lane, it has no road
-                        conn_str = print_poly_conn(road_points, name)
+                        conn_points = road_points
                         finished = True
             else: # Criterion 2, comp2 goes down if comp1 side is free
                 print_html_comment_indent(f'comp2 goes down if comp1 side is free')
@@ -976,7 +930,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                         road_points = [(x1, y), (x, y), (x, c2_y2)]
 
                         csm.allocate_offroad_horizontal_lane(highway_map, [x1 ,y ,x ,y]) # also save this as an offroad lane, it has no road
-                        conn_str = print_poly_conn(road_points, name)
+                        conn_points = road_points
                         finished = True
 
         elif range2 != None:    
@@ -1000,7 +954,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                         road_points = [(c1_x2, y), (x, y), (x, y2)]
 
                         csm.allocate_offroad_vertical_lane(highway_map, [x, y, x, y2]) # also save this as an offroad lane, it has no road
-                        conn_str = print_poly_conn(road_points, name)
+                        conn_points = road_points
                         finished = True
             else: # Criterion 2, comp2 goes Right if comp1 side is free
                 # print(" Criteria12 else ---------------------------------------------------------------")
@@ -1019,7 +973,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                         road_points = [(x, y1), (x, y), (c2_x2, y)]
 
                         csm.allocate_offroad_vertical_lane(highway_map, [x, y1, x, y]) # also save this as an offroad lane, it has no road
-                        conn_str = print_poly_conn(road_points, name)
+                        conn_points = road_points
                         finished = True
 
 
@@ -1322,20 +1276,20 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
         
         for point in road_points:
             print_html_comment_indent(f'  point = {point}')
-        conn_str = print_poly_conn(road_points, name)
+        conn_points = road_points
 
-        # conn_str = print_poly_conn(road_points1, name)
-        # conn_str += print_poly_conn(road_points_center, name)
-        # conn_str += print_poly_conn(road_points2, name)
+        # conn_str = print_poly_conn(road_points1, layout_style, name)
+        # conn_str += print_poly_conn(road_points_center, layout_style, name)
+        # conn_str += print_poly_conn(road_points2, layout_style, name)
             
-    print(conn_str)
-
-    return {name:conn_str}
+    return conn_points
     
 
-def route_svg_comonnection(arch: pt.PlantumlArchitecture, name: str, obj: pt.PlantumlConnection, highway_map: dict, indent=0):
+def route_svg_comonnection(arch: pt.PlantumlArchitecture, name: str, obj: pt.PlantumlConnection, highway_map: dict, layout_style: dict, indent=0):
     print_html_comment_indent(f"route_svg_comonnection: {name} {obj.name} {obj.path}", indent) # false
     res = {}
+    poly_points = []
+    
     # Actualy a connection obj may have multiple single connections.
     # This is a list of pairs of componnents refs 
     single_connection_list = []
@@ -1353,9 +1307,13 @@ def route_svg_comonnection(arch: pt.PlantumlArchitecture, name: str, obj: pt.Pla
             comp1 = obj.comp1.ref
             comp2 = obj.comp2.ref
             single_connection_list.append((f"{name}", comp1, comp2))
+    
     for comp in single_connection_list:
-        res.update(route_single_comonnection(arch, comp[0], comp[1], comp[2], highway_map, indent+1))
-        
+        points = route_single_comonnection(arch, comp[0], comp[1], comp[2], highway_map, indent+1)
+        conn_str = print_poly_conn(points, obj, layout_style, comp[0])
+        # print(conn_str)
+        res.update({name:conn_str})
+      
     return res
 
 def get_rects_if_components_between_common_horizontal_lanes(highway_map, comp1, comp2, tree1, tree2, indent):
@@ -1433,3 +1391,63 @@ def get_rects_if_components_between_common_vertical_lanes(highway_map, comp1, co
 
     return None
 
+# def print_single_conn(x1, y1, x2, y2, con_obj, layout_style: dict, text = ""):
+
+    # return print_poly_conn([(x1, y1),(x2, y2)], con_obj, layout_style, text)
+
+def print_poly_conn(points, con_obj, layout_style: dict, text = ""):
+
+    text_anchor = "start"
+    if points[1][0] < points[0][0]:
+        text_anchor = "end"
+    
+    rotate = 0
+    if points[1][1] > points[0][1]:
+        rotate = 90
+    elif points[1][1] < points[0][1]:
+        rotate = -90
+    
+    point_str_list = []
+    for point in points:
+        point_str_list.append(f"{point[0]},{point[1]}")
+    points_str = " ".join(point_str_list)
+    
+    # Get fonts from layout_style
+    connection_font_family = layout_style.get("connection-font-family", "Consolas")
+    connection_font_size   = layout_style.get("connection-font-size", 12)
+    
+    # Replace if customized layout style in the componnent
+    connection_font_family = c.get_obj_prop(con_obj, "connection-font-family", connection_font_family)
+    connection_font_size   = c.get_obj_prop(con_obj, "connection-font-size", connection_font_size)
+
+    # color = ""
+    # if "color" in plantuml_obj.metadata_dict:
+        # if plantuml_obj.metadata_dict["color"].startswith("#"):
+            # color = plantuml_obj.metadata_dict["color"]
+        # else:
+            # color = "#"+plantuml_obj.metadata_dict["color"]
+ 
+    # Get colors from component
+    fill, stroke, stroke_width, font_weight, text_color = c.get_default_color_style(con_obj.type)
+    stroke = c.get_obj_prop(con_obj, "color", stroke)
+        
+    line = "-[norank]-"
+    if "line" in con_obj.metadata_dict:
+        line = con_obj.metadata_dict["line"]
+    elif con_obj.metadata_dict["direction"] == "out":
+        line = "-[norank]->"
+    elif con_obj.metadata_dict["direction"] == "in":
+        line = "<-[norank]-"
+
+    print(f'points = {points}')
+    stroke_dasharray, arrow1, arrow2 = c.get_arrow_style(line, [points[0], points[1]], [points[-1], points[-2]])
+        
+    svg_str = f'<polyline points="{points_str}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="{stroke_dasharray}"/>'
+    svg_str += f'<text x="{points[0][0] +10}" y="{points[0][1] - 3}" font-family="{connection_font_family}" font-size="{connection_font_size}" fill="{text_color}" transform="rotate({rotate} {points[0][0]},{points[0][1]})"  text-anchor="{text_anchor}" >{text}</text>'
+    
+    if arrow1 != None:
+        svg_str += f'<polyline {arrow1} stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="{stroke_dasharray}"/>'
+    if arrow2 != None:
+        svg_str += f'<polyline {arrow2} stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="{stroke_dasharray}"/>'
+    
+    return svg_str

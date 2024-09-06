@@ -108,7 +108,7 @@ def create_arrow(conn_dir, type:Arrow):
     center = conn_dir[0]
     from_dir = conn_dir[1]
 
-    print(f'center = {center}, from_dir = {from_dir}')
+    # print(f'center = {center}, from_dir = {from_dir}')
 
     if type == Arrow.SIMPLE:
         points = [(center[0] + 9, center[1] - 4), (center[0],center[1]), (center[0] + 9, center[1] + 4), (center[0] + 6, center[1]), (center[0] + 9, center[1] - 4)]

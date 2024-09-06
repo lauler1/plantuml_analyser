@@ -312,8 +312,10 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
         #    max_row_height -> max_line_len_u
         #    max_width -> max_len_u
         #    max_height-> max_len_v
+        #
+        # Precedence of the orientation rules, from least to most priority: architecture arrow_dir, architecture svg_orientation, object svg_orientation.
         
-        if orientation == Orientation.LEFT_RIGHT:
+        if orientation == Orientation.TOP_DOWN:
             rect_min_u_len = 'rect_min_y_len'
             rect_min_v_len = 'rect_min_x_len'
             rect_u_pos = 'rect_y_pos'
@@ -346,7 +348,8 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                 for key, child in list_of_obj:
                     if not isinstance(child, pt.PlantumlType) or isinstance(child, pt.PlantumlConnection):
                         continue
-                    recurrent_layout_sizing(child, orientation, indent+1)
+                    inner_orientation=c.get_obj_prop(child, "svg_orientation", orientation)
+                    recurrent_layout_sizing(child, inner_orientation, indent+1)
                 
                 margin = c.get_obj_prop(obj, 'margin', layout_style['margin'])
                 padding = c.get_obj_prop(obj, 'padding', layout_style['padding'])
@@ -364,20 +367,28 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                 current_v += margin + padding + extra_margin
                 last_u = current_u
                 last_v = current_v
+
+                text_with = calculate_text_dim(obj.name, layout_style["title-font-size"])
+                icon_space = calculate_icon_space(obj, layout_style)
                     
                 # else: # Do not add title to architecture
-                if orientation == Orientation.LEFT_RIGHT:
+                if orientation == Orientation.TOP_DOWN:
                     road_orientation = cr.DirType.VERTICAL
                     current_u += title_height
                     road_w = current_v
                     road_h = current_u
                     addr_pos = [cr.Dir.LEFT, cr.Dir.RIGHT] # The two directions to the closest roads for a component address
+                    max_len_v  = max(obj.metadata_dict[rect_min_v_len], text_with + icon_space, (2*margin) + (2*padding) + (2*extra_margin))
+                    max_len_u = max(obj.metadata_dict[rect_min_u_len], (2*margin) + (2*padding) + (2*extra_margin) + title_height)
                 else:
                     road_orientation = cr.DirType.HORIZONTAL
                     current_v += title_height
                     road_w = current_u
                     road_h = current_v
                     addr_pos = [cr.Dir.UP, cr.Dir.DOWN]
+                    max_len_u  = max(obj.metadata_dict[rect_min_u_len], text_with + icon_space, (2*margin) + (2*padding) + (2*extra_margin))
+                    max_len_v = max(obj.metadata_dict[rect_min_v_len], (2*margin) + (2*padding) + (2*extra_margin) + title_height)
+
 
                 line_len_us = []
                 max_line_len_u = 0
@@ -392,12 +403,6 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                 local_roads_map["rects"][road_name] = [int(road_x), int(road_y), int(road_w), int(road_h)]
                 local_roads_map["orientations"][road_name] = road_orientation
                 local_roads_map["allocations"][road_name] = []
-
-                text_with = calculate_text_dim(obj.name, layout_style["title-font-size"])
-                icon_space = calculate_icon_space(obj, layout_style)
-                # print_html_comment_indent(f"text_with: {text_with} for {obj.name}")               
-                max_len_u  = max(obj.metadata_dict[rect_min_u_len], text_with + icon_space, (2*margin) + (2*padding) + (2*extra_margin))
-                max_len_v = max(obj.metadata_dict[rect_min_v_len], (2*margin) + (2*padding) + (2*extra_margin) + title_height)
                 
                 for key, child in obj.__dict__.items(): # Use __dict__ to keep decl order
                     
@@ -410,7 +415,7 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                         main_road_index += 1
                         road_name = f"M {obj.path} {main_road_index}"
                         # else: # Do not add title to architecture
-                        if orientation == Orientation.LEFT_RIGHT:
+                        if orientation == Orientation.TOP_DOWN:
                             # current_u += title_height
                             road_x = (last_v + max_line_len_u)
                             road_y = 0
@@ -441,7 +446,7 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                     current_u += (child.metadata_dict[rect_u_len] + (2*margin) + (2*extra_margin))
                     max_line_len_u = max(line_len_us)
                     
-                    max_len_u = max(max_len_u, (current_u))# + margin + padding + extra_margin))
+                    max_len_u = max(max_len_u, current_u)# + margin + padding + extra_margin))
                     max_len_v = max(max_len_v, (current_v + max_line_len_u + margin + padding + extra_margin))
 
                     last_u = current_u
@@ -460,7 +465,7 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                 main_road_index += 1
                 road_name = f"M {obj.path} {main_road_index}"
                 # else: # Do not add title to architecture
-                if orientation == Orientation.LEFT_RIGHT:
+                if orientation == Orientation.TOP_DOWN:
                     # current_u += title_height
                     road_x = last_v + max_line_len_u
                     road_y = 0
@@ -481,7 +486,7 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                 for key, road in local_roads_map["rects"].items():
                     # Adjust w and h for all main roads
                     if key[0] == "M":
-                        if orientation == Orientation.LEFT_RIGHT:
+                        if orientation == Orientation.TOP_DOWN:
                             road[3] = max_len_u
                         else:
                             road[2] = max_len_u
@@ -528,14 +533,13 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
     # print("\nSize\n-------------------------------------------------------------------------------\n")
     
     orientation = Orientation.LEFT_RIGHT
-    #orientation = Orientation.TOP_DOWN
-    # print('plantuml_arch.metadata_dict["orientation"] = ', plantuml_arch.metadata_dict["orientation"])
-    if "orientation" in plantuml_arch.metadata_dict and plantuml_arch.metadata_dict["orientation"] == "top to bottom direction":
+    # Yes, arrow_dir and svg_orientation are perpendicular to each other!
+    if c.get_obj_prop(plantuml_arch, "arrow_dir", "top to bottom direction") == "left to right direction":
         orientation = Orientation.TOP_DOWN
-        highway_map["orientation"] = orientation
-        
-    recurrent_layout_sizing(plantuml_arch, orientation)
+    orientation = c.get_obj_prop(plantuml_arch, "svg_orientation", orientation)
+    highway_map[orientation] = orientation
     
+    recurrent_layout_sizing(plantuml_arch, orientation)
     # Adjust the highway_map adding the absolute positions to the relative ones created by recurrent_layout_sizing
     for key, road in highway_map["roads"]["rects"].items():
         # print(f" Adding offset to {key}")

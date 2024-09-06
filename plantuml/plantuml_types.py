@@ -69,6 +69,7 @@ class PlantumlType:
             remove: Remove completely a component of drawing, e.g.: remove=True
             hide: Make a component invisible, but still occupining the place, e.g.: hide=True
             color: Define the colors of the component as plantuml syntax, e.g.: color="pink;line:red;line.bold;text:red"
+            svg_orientation: Used by SVG architecture to define the orientation of inner items, can be Orientation.TOP_DOWN or LEFT_RIGHT.
 
             title_height: SVG title height. Default 15.
             title_font_family: Title font family. Default 'Consolas'.
@@ -431,7 +432,8 @@ class PlantumlArchitecture(PlantumlContainer):
     
     See base class PlantumlType for more.
     options:
-        skinparam="..."
+        arrow_dir: default orientation of the arrows for plantUML, it can be "left to right direction" or "top to bottom direction". For SVG, architecture, svg_orientation has precedence.
+        skinparam: plantUML skin parameters, it is a multi-line text.
     """
 
     @plantuml_architecture_decorator
@@ -439,8 +441,8 @@ class PlantumlArchitecture(PlantumlContainer):
         super().__init__(name, id)
         self.type = "Architecture"
         self.metadata_dict["layout_connectors"] = [] # Connections used to force placing components next other
-        self.metadata_dict["orientation"] = "left to right direction"
-        self.metadata_dict["orientation"] = "top to bottom direction" # this is the orientation of plantuml arrows
+        self.metadata_dict["arrow_dir"] = "left to right direction"
+        self.metadata_dict["arrow_dir"] = "top to bottom direction" # this is the orientation of plantuml arrows
         self.metadata_dict["skinparam"] = """
 skinparam note{
   BackgroundColor #FFFFCB

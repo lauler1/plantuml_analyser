@@ -176,8 +176,8 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
 
     connections = {} # Use dictionary to avoid duplications
     print("@startuml")
-    if "orientation" in plantuml_arch.metadata_dict:
-        print(plantuml_arch.metadata_dict["orientation"])
+    if "arrow_dir" in plantuml_arch.metadata_dict:
+        print(plantuml_arch.metadata_dict["arrow_dir"])
     if "skinparam" in plantuml_arch.metadata_dict:
         print(plantuml_arch.metadata_dict["skinparam"])
     recurrent(plantuml_arch, connections, 0)

@@ -11,7 +11,7 @@ from plantuml.generate_svg_html import redirect_svg_output_to_html
 from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup, ArchBreakLine
 from plantuml.plantuml_simulation import PlantumlSimulation
 
-from plantuml.svg_architecture import do_svg_architecture
+from plantuml.svg_architecture import do_svg_architecture, Orientation
 import plantuml.connection_routing as cr
 
 # Exemplo 1 -------------------------------------------------------------------
@@ -211,9 +211,10 @@ It can also be simulated.
 
         self.brk1 = ArchBreakLine()
 
-        self.component3 = PlantumlComponent("Mycomponent 3")
-        self.component4 = PlantumlComponent()
-        self.component5 = PlantumlComponent()
+        self.group1 = PlantumlGroup()
+        self.group1.component3 = PlantumlComponent("Mycomponent 3")
+        self.group1.component4 = PlantumlComponent()
+        self.group1.component5 = PlantumlComponent()
         self.class_activity = PlantumlActivity("Class Activity")
         
         self.component6 = PlantumlComponent("PlantumlComponent 6")
@@ -263,7 +264,10 @@ It can also be simulated.
         self.frame2 = PlantumlFrame("My Frame 2")
         self.frame2.component_super_arch2 = MyComponent2("Mycomponent_super_arch 2", color="pink;line:red;line.bold;text:red")
         self.frame2.component_super_arch1 = MyComponent1("Mycomponent_super_arch 1")
-        self.frame2.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3")
+        self.frame2.component_super_arch3 = PlantumlComponent("Mycomponent_super_arch 3", svg_orientation=Orientation.TOP_DOWN)
+        self.frame2.component_super_arch3.add(PlantumlActivity("vertical activity 1"))
+        self.frame2.component_super_arch3.add(PlantumlActivity("vertical activity 2"))
+        self.frame2.component_super_arch3.add(PlantumlActivity("vertical activity 3"))
         self.conn4 = PlantumlConnection("Conn 4", self.frame2.component_super_arch1, self.frame2.component_super_arch2)
 
         self.conn5 = PlantumlConnection("Conn 5", self.frame2.component_super_arch1.activity1, self.frame.sub_architecture.component2.activity1, color="red")
@@ -275,6 +279,8 @@ It can also be simulated.
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
 myarch = MySuperArchitecture("my super architecture")
+myarch.set_options(svg_orientation=Orientation.LEFT_RIGHT) # TOP_DOWN, LEFT_RIGHT
+
 # myarch.arch_post_init()
 
 
@@ -304,6 +310,7 @@ def case7(myarch):
     do_svg_architecture(myarch, print_roads=False)
 
 # myarch.frame.set_options(hide=True) 
+
 case7(myarch) 
 # introspect_object(myarch)
 
@@ -314,7 +321,7 @@ case7(myarch)
 
 new_arch = clone_architecture(myarch, "Nome da nova classe")
 new_arch.add(PlantumlComponent("Added to the clone"))
-new_arch.frame.sub_architecture.component4.set_options(hide=True)
+new_arch.frame.sub_architecture.group1.component4.set_options(hide=True)
 # # new_arch.get_sub_obj_by_name("Myactor 1")
 # # new_arch.get_sub_obj_by_name("Actor activity")
 # # new_arch.get_sub_obj_by_name("Conn 1")

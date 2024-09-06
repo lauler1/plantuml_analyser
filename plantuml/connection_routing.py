@@ -470,12 +470,12 @@ def get_components_in_the_path(arch: pt.PlantumlArchitecture, coord: tuple[int, 
 
 def get_components_rects_in_front(arch: pt.PlantumlArchitecture, src_coord: tuple[int, int, int, int], dst_coord: tuple[int, int, int, int], dir: Dir, component_type: pt.PlantumlType = pt.PlantumlContainer, indent=0)  -> list[tuple[int, int, int, int]]:
     """
-    Returns all rectangles of component of a specific type in a direction that are in front of the src (i.e. they are obstruction the direct view from src to dst).
+    Returns all rectangles of component of a specific type in a direction that are in front of the src (i.e. they are obstruction the direct view from src to dst). It does not care if the destiny is exactly in the path.
     It considers only visible components.
     
     arch: is the architecture of type PlantumlArchitecture that contains all the components.
     src_coord: the rectabgle coordinates (x1, y1, x2, y2) of the source in the architecture from where the measure shall be done.
-    src_coord: the rectangle coordinates (x1, y1, x2, y2) of the destiny (target) in the architecture to where the measure shall be done.
+    dst_coord: the rectangle coordinates (x1, y1, x2, y2) of the destiny (target) in the architecture to where the measure shall be done.
     dir_type: direction to use in the analysis, DirType.HORIZONTAL or DirType.VERTICAL.
     component_type: The type of the component to be consider for colision detection.
     
@@ -999,7 +999,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x = c1_x2
                 # y = int(c1_y1 + c1_y2) / 2
                 y = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.RIGHT, [(c1_y1, c1_y2)])
-                r_x = lane = csm.allocate_a_road_lane(highway_map, road)
+                r_x = lane = csm.allocate_a_road_lane(highway_map, road, False)
                 r_y = y
             else:
                 # print(f'Criterion 3, con1 starts LEFT')
@@ -1007,7 +1007,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x = c1_x1
                 # y = int(c1_y1 + c1_y2) / 2
                 y = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.LEFT, [(c1_y1, c1_y2)])
-                r_x = lane = csm.allocate_a_road_lane(highway_map, road)
+                r_x = lane = csm.allocate_a_road_lane(highway_map, road, False)
                 r_y = y
         else: # Dir.UP in address or Dir.DOWN in address:
             if dir_vec[1] > 0:
@@ -1017,7 +1017,7 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.DOWN, [(c1_x1, c1_x2)])
                 y = c1_y2
                 r_x = x
-                r_y = lane = csm.allocate_a_road_lane(highway_map, road)
+                r_y = lane = csm.allocate_a_road_lane(highway_map, road, False)
             else:
                 # print(f'Criterion 3, con1 starts UP')
                 road = address[Dir.UP]
@@ -1025,8 +1025,8 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x = csm.allocate_an_address_on_border(highway_map, comp1.path, Dir.UP, [(c1_x1, c1_x2)])
                 y = c1_y1
                 r_x = x
-                r_y = lane = csm.allocate_a_road_lane(highway_map, road)
-
+                r_y = lane = csm.allocate_a_road_lane(highway_map, road, False)
+        # just_crossing = True # The componnent is not actually using a roud, just crossing it
         prev_road1 = (road, lane)
         road_points1.append((x, y))        
         last_coord1 = (r_x, r_y)
@@ -1045,61 +1045,77 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                     print_html_comment_indent(f'  RIGHT')
                     road = address[Dir.RIGHT]
                     if csm.is_last_road(highway_map, prev_road1[0]):
-                        x = lane = csm.allocate_a_road_lane(highway_map, road) #get_horizontal_center_of_road(highway_map, road)
+                        csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1])
+                        x = lane = csm.allocate_a_road_lane(highway_map, road, False) #get_horizontal_center_of_road(highway_map, road)
                         y = last_coord1[1]
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                         print_html_comment_indent(f'   is_last_road')
                     else:
                         x = last_coord1[0]
                         y = csm.get_vertical_end(highway_map, road, dir_vec[0])
-                        r_x = lane = csm.allocate_a_road_lane(highway_map, road)
+                        # csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_x = lane = csm.allocate_a_road_lane(highway_map, road, True)
                         r_y = x
+                        # just_crossing = False
                         print_html_comment_indent(f'   ')
                 else: # Dir.LEFT
                     print_html_comment_indent(f'  LEFT')
                     road = address[Dir.LEFT]
                     if csm.is_first_road(prev_road1[0]):
-                        x = lane = csm.allocate_a_road_lane(highway_map, road)
+                        csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1])
+                        x = lane = csm.allocate_a_road_lane(highway_map, road, False)
                         y = last_coord1[1]
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                         print_html_comment_indent(f'   is_first_road')
                     else:
                         x = last_coord1[0]
                         y = csm.get_vertical_end(highway_map, road, dir_vec[0])
-                        r_x = lane = csm.allocate_a_road_lane(highway_map, road)
+                        # csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_x = lane = csm.allocate_a_road_lane(highway_map, road, True)
                         r_y = x
+                        # just_crossing = False
                         print_html_comment_indent(f'   ')
             else: # Dir.UP in address or Dir.DOWN in address:
                 if dir_vec[1] > 0:
                     print_html_comment_indent(f'  DOWN')
                     road = address[Dir.DOWN]
                     if csm.is_last_road(highway_map, prev_road1[0]):
+                        csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1])
                         x = last_coord1[0]
-                        y = lane = csm.allocate_a_road_lane(highway_map, road)
+                        y = lane = csm.allocate_a_road_lane(highway_map, road, False)
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                         print_html_comment_indent(f'   is_last_road')
                     else:
                         x = csm.get_horizontal_end(highway_map, road, dir_vec[0])
                         y = last_coord1[1]
                         r_x = x
-                        r_y = lane = csm.allocate_a_road_lane(highway_map, road)
+                        # csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_y = lane = csm.allocate_a_road_lane(highway_map, road, True)
+                        # just_crossing = False
                         print_html_comment_indent(f'   ')
                 else: # Dir.UP
                     print_html_comment_indent(f'  UP')
                     road = address[Dir.UP]
                     if csm.is_first_road(prev_road1[0]):
+                        csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1])
                         x = last_coord1[0]
-                        y = lane = csm.allocate_a_road_lane(highway_map, road)
+                        y = lane = csm.allocate_a_road_lane(highway_map, road, False)
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                     else:
                         x = csm.get_horizontal_end(highway_map, road, dir_vec[0])
                         y = last_coord1[1]
                         r_x = x
-                        r_y = lane = csm.allocate_a_road_lane(highway_map, road)
+                        # csm.deallocate_a_road_lane(highway_map, prev_road1[0], prev_road1[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_y = lane = csm.allocate_a_road_lane(highway_map, road, True)
+                        # just_crossing = False
                         print_html_comment_indent(f'   ')
                     
             prev_road1 = (road, lane)
@@ -1109,7 +1125,6 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 last_coord1 = (r_x, r_y)
                 road_points1.append(last_coord1)        
             print_html_comment_indent(f' {comp.name}: use road = {road}', indent+1)
-
 
         print_html_comment_indent(f'------------------------------------------')
         print_html_comment_indent(f'Routing comp2 = {comp2.name}')
@@ -1127,14 +1142,14 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x = c2_x2
                 # y = int(c2_y1 + c2_y2) / 2
                 y = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.RIGHT, [(c2_y1, c2_y2)])
-                r_x = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                r_x = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                 r_y = y
             else:
                 road = address[Dir.LEFT]
                 x = c2_x1
                 # y = int(c2_y1 + c2_y2) / 2
                 y = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.LEFT, [(c2_y1, c2_y2)])
-                r_x = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                r_x = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                 r_y = y
         else: # Dir.UP in address or Dir.DOWN in address:
             if dir_vec[1] > 0: # Use inverted dir, because comp2 is inverse direction
@@ -1143,15 +1158,16 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                 x = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.DOWN, [(c2_x1, c2_x2)])
                 y = c2_y2
                 r_x = x
-                r_y = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                r_y = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
             else:
                 road = address[Dir.UP]
                 # x = int(c2_x1 + c2_x2) / 2
                 x = csm.allocate_an_address_on_border(highway_map, comp2.path, Dir.UP, [(c2_x1, c2_x2)])
                 y = c2_y1
                 r_x = x
-                r_y = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                r_y = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
 
+        # just_crossing = True # The componnent is not actually using a roud, just crossing it
         prev_road2 = (road, lane)
         last_coord2 = (x, y)
         print_html_comment_indent(f' last_coord2 = {last_coord2}')
@@ -1174,28 +1190,36 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                     if csm.is_last_road(highway_map, prev_road2[0]):
                         print_html_comment_indent(f'   is_last_road')
 
-                        x = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                        csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1])
+                        x = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                         y = last_coord2[1]
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                     else:
                         x = last_coord2[0]
                         y = csm.get_road_vertical_end(highway_map, road, dir_vec[0])
-                        r_x = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                        # csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_x = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                         r_y = y
+                        # just_crossing = False
                 else:
                     print_html_comment_indent(f'  LEFT')
                     road = address[Dir.LEFT]
                     if csm.is_first_road(prev_road2[0]):
-                        x = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                        csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1])
+                        x = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                         y = last_coord2[1]
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                     else:
                         x = last_coord2[0]
                         y = csm.get_road_vertical_end(highway_map, road, dir_vec[0])
-                        r_x = lane = csm.allocate_a_road_lane(highway_map, road), prev_road1
+                        # csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_x = lane = csm.allocate_a_road_lane(highway_map, road, True), prev_road1
                         r_y = y
+                        # just_crossing = False
             else: # Dir.UP in address or Dir.DOWN in address:
                 if dir_vec[1] > 0: # Use inverted dir, because comp2 is inverse direction
                     print_html_comment_indent(f'  DOWN')
@@ -1203,30 +1227,38 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
                     if csm.is_last_road(highway_map, prev_road2[0]):
                         print_html_comment_indent(f'   is_last_road')
 
+                        csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1])
                         x = last_coord2[0]
-                        y = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                        y = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                     else:
                         print_html_comment_indent(f'   NOT is_last_road')
                         
                         x = csm.get_road_horizontal_end(highway_map, road, dir_vec[0])
                         y = last_coord2[1]
                         r_x = x
-                        r_y = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)                        
+                        # csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_y = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)                        
+                        # just_crossing = False
                 else:
                     print_html_comment_indent(f'  UP')
                     road = address[Dir.UP]
                     if csm.is_first_road(prev_road2[0]):
                         x = last_coord2[0]
-                        y = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                        csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1])
+                        y = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
                         r_x = None # Not needed
                         r_y = None # Not needed
+                        # just_crossing = True
                     else:
                         x = csm.get_road_horizontal_end(highway_map, road, dir_vec[0])
                         y = last_coord2[1]
                         r_x = x
-                        r_y = lane = csm.allocate_a_road_lane(highway_map, road, prev_road1)
+                        # csm.deallocate_a_road_lane(highway_map, prev_road2[0], prev_road2[1]) if just_crossing == True else None # deallocate prevous lane
+                        r_y = lane = csm.allocate_a_road_lane(highway_map, road, True, prev_road1)
+                        # just_crossing = False
 
             prev_road2 = (road, lane)
             last_coord2 = (x, y)
@@ -1241,29 +1273,55 @@ def route_single_comonnection(arch: pt.PlantumlArchitecture, name: str, comp1: p
         # In the end, connect the last road parts that connects all together
         road_points_center = [] # TODO TBD
 
-
         #  At this point, both sides of the connections are at the same final architecture
         if prev_road1[0] == prev_road2[0]: # If they are at the same road
             road_points_center = [last_coord1, last_coord2]
         else: # If they are NOT in the same road
+
             if highway_map["roads"]["orientations"][prev_road2[0]] == DirType.HORIZONTAL:
-                dist_to_end_1 = csm.get_closest_horizontal_dist_to_end(highway_map, prev_road1[0], last_coord1[0])
-                dist_to_end_2 = csm.get_closest_horizontal_dist_to_end(highway_map, prev_road2[0], last_coord2[0])
-                if abs(dist_to_end_1) < abs(dist_to_end_2): # road of comp1 is the master
-                    x1 = csm.get_road_horizontal_end(highway_map, prev_road1[0], dist_to_end_1)
-                else: # road of comp2 is the master
-                    x1 = csm.get_road_horizontal_end(highway_map, prev_road1[0], dist_to_end_2)
+                
+                dir = Dir.UP
+                if last_coord1[1] < last_coord2[1]:
+                    dir = Dir.DOWN
+
+                components_rects1 = get_components_rects_in_front(arch, (last_coord1[0], last_coord1[1], last_coord1[0], last_coord1[1]), (last_coord2[0], last_coord2[1], last_coord2[0], last_coord2[1]), dir, pt.PlantumlContainer, indent+1)
+                components_rects2 = get_components_rects_in_front(arch, (last_coord2[0], last_coord2[1], last_coord2[0], last_coord2[1]), (last_coord1[0], last_coord1[1], last_coord1[0], last_coord1[1]), dir, pt.PlantumlContainer, indent+1)
+
+                if len(components_rects1) == 0: # If no obstacle in front of last_coord1, use it
+                    x1 = last_coord1[0]
+                elif len(components_rects2) == 0: # else if no obstacle in front of last_coord2, use it
+                    x1 = last_coord2[0]
+                else: # Else go to one of the edges
+                    dist_to_end_1 = csm.get_closest_horizontal_dist_to_end(highway_map, prev_road1[0], last_coord1[0])
+                    dist_to_end_2 = csm.get_closest_horizontal_dist_to_end(highway_map, prev_road2[0], last_coord2[0])
+                    if abs(dist_to_end_1) < abs(dist_to_end_2): # road of comp1 is the master for the edge
+                        x1 = csm.get_road_horizontal_end(highway_map, prev_road1[0], dist_to_end_1)
+                    else: # road of comp2 is the master for the edge
+                        x1 = csm.get_road_horizontal_end(highway_map, prev_road1[0], dist_to_end_2)
                 y1 = last_coord1[1]
                 x2 = x1
                 y2 = last_coord2[1]
             
-            else: # If DirType.VERTICAL
-                dist_to_end_1 = csm.get_closest_vertical_dist_to_end(highway_map, prev_road1[0], last_coord1[1])
-                dist_to_end_2 = csm.get_closest_vertical_dist_to_end(highway_map, prev_road2[0], last_coord2[1])
-                if abs(dist_to_end_1) < abs(dist_to_end_2): # road of comp1 is the master
-                    y1 = csm.get_road_vertical_end(highway_map, prev_road1[0], dist_to_end_1)
-                else: # road of comp2 is the master
-                    y1 = csm.get_road_vertical_end(highway_map, prev_road1[0], dist_to_end_2)
+            else: # If roads orientation == DirType.VERTICAL
+            
+                dir = Dir.LEFT
+                if last_coord1[0] < last_coord2[0]:
+                    dir = Dir.RIGHT
+
+                components_rects1 = get_components_rects_in_front(arch, (last_coord1[0], last_coord1[1], last_coord1[0], last_coord1[1]), (last_coord2[0], last_coord2[1], last_coord2[0], last_coord2[1]), dir, pt.PlantumlContainer, indent+1)
+                components_rects2 = get_components_rects_in_front(arch, (last_coord2[0], last_coord2[1], last_coord2[0], last_coord2[1]), (last_coord1[0], last_coord1[1], last_coord1[0], last_coord1[1]), dir, pt.PlantumlContainer, indent+1)
+
+                if len(components_rects1) == 0: # If no obstacle in front of last_coord1, use it
+                    y1 = last_coord1[1]
+                elif len(components_rects2) == 0: # else if no obstacle in front of last_coord2, use it
+                    y1 = last_coord2[1]
+                else: # Else go to one of the edges
+                    dist_to_end_1 = csm.get_closest_vertical_dist_to_end(highway_map, prev_road1[0], last_coord1[1])
+                    dist_to_end_2 = csm.get_closest_vertical_dist_to_end(highway_map, prev_road2[0], last_coord2[1])
+                    if abs(dist_to_end_1) < abs(dist_to_end_2): # road of comp1 is the master for the edge
+                        y1 = csm.get_road_vertical_end(highway_map, prev_road1[0], dist_to_end_1)
+                    else: # road of comp2 is the master for the edge
+                        y1 = csm.get_road_vertical_end(highway_map, prev_road1[0], dist_to_end_2)
                 x1 = last_coord1[0]
                 y2 = y1
                 x2 = last_coord2[0]
@@ -1439,7 +1497,7 @@ def print_poly_conn(points, con_obj, layout_style: dict, text = ""):
     elif con_obj.metadata_dict["direction"] == "in":
         line = "<-[norank]-"
 
-    print(f'points = {points}')
+    # print(f'points = {points}')
     stroke_dasharray, arrow1, arrow2 = c.get_arrow_style(line, [points[0], points[1]], [points[-1], points[-2]])
         
     svg_str = f'<polyline points="{points_str}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="{stroke_dasharray}"/>'

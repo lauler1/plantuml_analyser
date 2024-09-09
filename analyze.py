@@ -8,8 +8,9 @@ from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_
 from plantuml.redirect_output_to_file import redirect_output_to_file
 from plantuml.generate_plantuml_html import redirect_plantuml_output_to_html
 from plantuml.generate_svg_html import redirect_svg_output_to_html
-from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup, ArchBreakLine
+from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup, ArchBreakLine, PlantumlDataType
 from plantuml.plantuml_simulation import PlantumlSimulation
+from plantuml.plantuml_class import do_plantuml_class_diagram, do_plantuml_object_diagram
 
 from plantuml.svg_architecture import do_svg_architecture, Orientation
 import plantuml.connection_routing as cr
@@ -279,7 +280,7 @@ It can also be simulated.
         super().__init__(name)  # Call the __init__ method of PlantumlArchitecture
 
 myarch = MySuperArchitecture("my super architecture")
-myarch.set_options(svg_orientation=Orientation.LEFT_RIGHT) # TOP_DOWN, LEFT_RIGHT
+myarch.set_options(svg_orientation=Orientation.TOP_DOWN) # TOP_DOWN, LEFT_RIGHT
 
 # myarch.arch_post_init()
 
@@ -347,6 +348,82 @@ mysim.set_options(comp_order=[\
 case6(mysim)
 
 
+from abc import ABC, abstractmethod
+class Base(ABC):
+    @abstractmethod
+    def my_abstract_method(self):
+        pass
+    
+    @staticmethod
+    @abstractmethod
+    def my_abstract_func():
+        pass
+
+class A1(Base):
+    static_val: int = None
+
+class A2():
+    static_val: int = 10
+
+class Compos1():
+    var1 = 0
+
+class Compos2():
+    def __init__(self):
+        self.comp1 = Compos1()
+
+class B(A1, A2):
+    def __init__(self):
+        self.value = "my value B"
+        self.a = 10
+        self.b = [1,2,3]
+        self.comp1 = Compos1()
+        self.comp2 = Compos2()
+
+    def my_abstract_method(self):
+        pass
+    
+    @staticmethod
+    def my_abstract_func():
+        pass
+
+class C(A1):
+    st = 10
+    def __init__(self):
+        self.value = "my value C"
+        
+    def my_func(self):
+        pass
+
+    @staticmethod
+    def my_static_func():
+        pass
+
+    def my_abstract_method(self):
+        pass
+    
+    @staticmethod
+    def my_abstract_func():
+        pass
+
+class ClassDiagram(PlantumlDataType):
+
+    def __init__(self):
+        super().__init__()
+        self.b = B()
+        self.c = C()
+        self.a: int = 0
+
+@redirect_plantuml_output_to_html('output/class_diagram.html', "Data Class Diagram", "This is a simple class diagram using plantuml.")
+def case7(class_diagram=ClassDiagram()):
+    do_plantuml_class_diagram(class_diagram)
+case7()
+
+@redirect_plantuml_output_to_html('output/object_diagram.html', "Object Diagram", "This is a simple object diagram using plantuml.")
+def case8(class_diagram=ClassDiagram()):
+    do_plantuml_object_diagram(class_diagram)
+case8()
+
 cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.component_super_arch1.activity2, myarch.frame.sub_architecture.component1.activity1, myarch.frame.sub_architecture.component2.activity1])
 
 # print("\n Old----------------------------------------------------------------------------------------")
@@ -358,3 +435,7 @@ cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.co
 
 
 # A version of PlantumlConnection used only to align components on the screen: https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
+
+# TODO: Add processes in the architecture diagrams.
+# TODO: Add class diagrams, also include other containes like dictionaries and json.
+

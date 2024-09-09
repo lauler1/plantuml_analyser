@@ -47,10 +47,41 @@ def plantuml_architecture_decorator(init_func):
         self.arch_post_init()
     return wrapper
 
+class PlantumlDataType:
+    """
+    Base class for all PlantUML architectural types. The objects inside this class will be showed in the class/object diagram.
+    Valid to all derived classes.
+    options:
+        arrow_dir: default orientation of the arrows for plantUML, it can be "left to right direction" or "top to bottom direction". For SVG, architecture, svg_orientation has precedence.
+        skinparam: plantUML skin parameters, it is a multi-line text.
+    """
+    def __init__(self, name="", id="", **options):
+    
+        self.metadata_dict = {}
+        self.metadata_dict["skinparam"] = """
+skinparam roundCorner 10
+skinparam class {
+BorderColor #7A694B
+backGroundColor #FCFDF8/EBE5D7
+}
+skinparam roundCorner 10
+skinparam object {
+BorderColor #7A694B
+backGroundColor #FCFDF8/EBE5D7
+}
+sprite deco <svg viewBox="0 0 16 16">
+<path fill="#801714" d="M 2 2 H 13 V 15 H 1Z"/>
+<path fill="#EEDCDA" d="M 3 3 H 12 V 8 H 3Z M 3 9 H 12 V 11 H 3Z M 3 12 H 12 V 14 H 3Z"/>
+</svg>
+skinparam linetype ortho
+"""
+        # self.metadata_dict["arrow_dir"] = "left to right direction"
+        self.metadata_dict.update(options)
+        
+
 class PlantumlType:
     """
-    Base class for all PlantUML architectural types
-    Valid to all derived classes.
+    Class to define data types to be displayed as class diagrams
     """
     
     # Class variable to count instances, used for auto name generation

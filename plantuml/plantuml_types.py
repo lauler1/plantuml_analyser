@@ -49,10 +49,9 @@ def plantuml_architecture_decorator(init_func):
 
 class PlantumlDataType:
     """
-    Base class for all PlantUML architectural types. The objects inside this class will be showed in the class/object diagram.
+    Base class for all PlantUML data types. The objects inside this class will be showed in the class/object diagram.
     Valid to all derived classes.
     options:
-        arrow_dir: default orientation of the arrows for plantUML, it can be "left to right direction" or "top to bottom direction". For SVG, architecture, svg_orientation has precedence.
         skinparam: plantUML skin parameters, it is a multi-line text.
     """
     def __init__(self, name="", id="", **options):
@@ -78,6 +77,27 @@ skinparam linetype ortho
         # self.metadata_dict["arrow_dir"] = "left to right direction"
         self.metadata_dict.update(options)
         
+class PlantumlDataNote:
+    """
+    Class to define comment notes for data objects and types inside a PlantumlDataType. The objects or types referred in the initialization will have a text note shown when using do_plantuml_class_diagram or do_plantuml_object_diagram
+    
+    owner: The PlantumlDataType owner of this note instance (use 'self').
+    ref: The object or type of object to add a note to.
+    note: Text note.
+    name: Optional name of a class or object to manually associate this note. It shall be used to replace ref (ref shall be None).
+    """
+    def __init__(self, owner: PlantumlDataType, ref=None, note: str ="Default note.", name = ""):
+        self.ref = ref
+        self.note = note
+        self.name = name
+        
+        if isinstance(owner, PlantumlDataType) and ref != None and not isinstance(ref, type):
+            for v_name, val in vars(owner).items():
+                if val is ref:
+                    self.name = v_name
+                    break
+        elif isinstance(ref, type):
+            self.name = ref.__name__
 
 class PlantumlType:
     """

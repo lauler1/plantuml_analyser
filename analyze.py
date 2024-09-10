@@ -8,7 +8,7 @@ from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_
 from plantuml.redirect_output_to_file import redirect_output_to_file
 from plantuml.generate_plantuml_html import redirect_plantuml_output_to_html
 from plantuml.generate_svg_html import redirect_svg_output_to_html
-from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup, ArchBreakLine, PlantumlDataType
+from plantuml.plantuml_types import PlantumlActor, PlantumlComponent, PlantumlInterface, PlantumlActivity, PlantumlArchitecture, PlantumlConnection, clone_architecture, PlantumlFrame, PlantumlGroup, ArchBreakLine, PlantumlDataType, PlantumlDataNote
 from plantuml.plantuml_simulation import PlantumlSimulation
 from plantuml.plantuml_class import do_plantuml_class_diagram, do_plantuml_object_diagram
 
@@ -369,8 +369,9 @@ class Compos1():
     var1 = 0
 
 class Compos2():
+    comp2_1 = 0
     def __init__(self):
-        self.comp1 = Compos1()
+        self.comp2_1 = Compos1()
 
 class B(A1, A2):
     def __init__(self):
@@ -413,6 +414,8 @@ class ClassDiagram(PlantumlDataType):
         self.b = B()
         self.c = C()
         self.a: int = 0
+        self.note1 = PlantumlDataNote(self, self.c, r"This is a note for\nself.c object.")
+        self.note2 = PlantumlDataNote(self, type(self.b), "This is a note for type(self.b).")
 
 @redirect_plantuml_output_to_html('output/class_diagram.html', "Data Class Diagram", "This is a simple class diagram using plantuml.")
 def case7(class_diagram=ClassDiagram()):
@@ -437,5 +440,8 @@ cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.co
 # A version of PlantumlConnection used only to align components on the screen: https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
 
 # TODO: Add processes in the architecture diagrams.
+# TODO: Add processes in the architecture diagrams.
 # TODO: Add class diagrams, also include other containes like dictionaries and json.
+# TODO: Hide all connections from architectre
+# TODO: Remove visibility of the hidden connections used for alignment in planuml_achitecture that were made temporary visible.
 

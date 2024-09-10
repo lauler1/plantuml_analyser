@@ -80,13 +80,13 @@ def print_attrs_with_class(class_type):
     return a dictionary of class.attribue and if this is an interface
     """
     attr_dict = {}
-    print (f'\'print_attrs_with_class {class_type.__name__}, {class_type}')
+    # print (f'\'print_attrs_with_class {class_type.__name__}, {class_type}')
     if not isinstance(class_type, (int, float, str, bool, type(None), Container)):
 
         # Get all instance methods (exclude static methods)
         for name, member in inspect.getmembers(class_type):
             if not name.startswith('__') and not name in EXCLUDE_LIST:
-                print(f'\' class {name}')
+                # print(f'\' class {name}')
                 key=f'{class_type.__name__}.{name}'
                 if inspect.isfunction(member):
                     abs = ""
@@ -108,7 +108,7 @@ def print_attrs_with_instance(class_name, class_object):
     The main diff between class and object here is that class has no values
     """
     attr_dict = {}
-    print (f'\'print_attrs_with_instance {class_name}, {class_object}, {type(class_object).__name__}')
+    # print (f'\'print_attrs_with_instance {class_name}, {class_object}, {type(class_object).__name__}')
     if not isinstance(class_object, (int, float, str, bool, type(None), Container)):
 
         # Get all instance methods (exclude static methods)
@@ -142,7 +142,7 @@ def get_associations(class_object, association_classes_set):
 
     for name, member in inspect.getmembers(class_object):
         if not isinstance(member, (int, float, str, bool, type(None), Container)) and not name.startswith('__') and not name in EXCLUDE_LIST and not inspect.isroutine(member):
-            association_classes_set.add(f'{class_object.__class__.__name__} -right-> {member.__class__.__name__}')
+            association_classes_set.add(f'{class_object.__class__.__name__} -right-> {member.__class__.__name__} : {name}')
             get_associations(member, association_classes_set)
         
         
@@ -161,6 +161,7 @@ def print_object_values(obj_name, object):
 def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     """
     This function creates a simple plantuml output representation of the data class diagram.
+    This function will only add PlantumlDataNote notes referring to classes, not to instances. 
     Argumnets:
         plantuml_data -- A class of a PlantumlDataType type.
         kwargs -- Optional key/value arguments.
@@ -176,21 +177,31 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
 
     # Get the set of all classes, including inheritance and interfaces
     classes_set = set()
+    notes = []
+    note_idx = 1
     for name, value in inspect.getmembers(plantuml_data):
         if not name.startswith('__'):
-            classes_set |= get_classes(value)
-            # print_class(name, value)
+            if isinstance(value, pt.PlantumlDataNote):
+                if isinstance(value.ref, type): # Only notes for types
+                    notes.append(f'note "{value.note}" as N{note_idx}')
+                    notes.append(f'N{note_idx} .. {value.name}')
+                    note_idx += 1
+                else:
+                    pass # Ignores notes for instances
+            else:
+                classes_set |= get_classes(value)
+                # print_class(name, value)
 
     # Get the set of classes associated with the objects, only the classes
     association_classes_set = set()
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__'):
+        if not name.startswith('__') and not isinstance(value, pt.PlantumlDataNote):
             get_associated_classes(value, association_classes_set)
 
     # Get the set of associations
     association_set = set()
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__'):
+        if not name.startswith('__') and not isinstance(value, pt.PlantumlDataNote):
             get_associations(value, association_set)
 
     # Get the dictionary of all class.attributes
@@ -221,23 +232,27 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
         print(inheritance)
 
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__') and not name in EXCLUDE_LIST and not name == "metadata_dict":
-            print (f'\'print_class_attrs_with_instance {name}')
+        if not name.startswith('__') and not name in EXCLUDE_LIST and not name == "metadata_dict" and not isinstance(value, pt.PlantumlDataNote):
+            # print (f'\'print_class_attrs_with_instance {name}')
             class_dict.update(print_attrs_with_instance(name, value))
 
     # Final print of the classes attributes
     for key, value in class_dict.items():
-        print(f'\' {key} = {value}')
+        # print(f'\' {key} = {value}')
         print(value)
         
     for association in association_set:
         print(association)
-    
+
+    for note in notes:
+        print(note)
+
     print("@enduml")
 
 def do_plantuml_object_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     """
     This function creates a simple plantuml output representation of the data object diagram.
+    This function will only add PlantumlDataNote notes referring to objects, not to classes. 
     Argumnets:
         plantuml_data -- A class of a PlantumlDataType type.
         kwargs -- Optional key/value arguments.
@@ -252,14 +267,27 @@ def do_plantuml_object_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
         print(plantuml_data.metadata_dict["skinparam"])
 
     cobj_dict = {}
+    notes = []
+    note_idx = 1
     for name, value in inspect.getmembers(plantuml_data):
         if not name.startswith('__') and not name == "metadata_dict":
-            print(f'object "{name}: {value.__class__.__name__}" as {name}')
-            cobj_dict.update(print_object_values(name, value))
+            if isinstance(value, pt.PlantumlDataNote):
+                if not isinstance(value.ref, type): # Only notes for instances
+                    notes.append(f'note "{value.note}" as N{note_idx}')
+                    notes.append(f'N{note_idx} .. {value.name}')
+                    note_idx += 1
+                else:
+                    pass # Ignores notes for types
+            else:
+                print(f'object "{name}: {value.__class__.__name__}" as {name}')
+                cobj_dict.update(print_object_values(name, value))
 
     # Final print of the objects values
     for key, value in cobj_dict.items():
-        print(f'\' {key} = {value}')
+        # print(f'\' {key} = {value}')
         print(value)
         
+    for note in notes:
+        print(note)
+
     print("@enduml")

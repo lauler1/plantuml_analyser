@@ -362,6 +362,10 @@ class Base(ABC):
 class A1(Base):
     static_val: int = None
 
+    def __init__(self):
+        self.__private = 0
+        self._protected = 0
+
 class A2():
     static_val: int = 10
 
@@ -369,17 +373,21 @@ class Compos1():
     var1 = 0
 
 class Compos2():
-    comp2_1 = 0
-    def __init__(self):
-        self.comp2_1 = Compos1()
+    __comp2_1 = Compos1()
+    def __init__(self, comp2_2 = None):
+        self.__comp2_1 = Compos1()
+        self.__comp2_2 = comp2_2
 
 class B(A1, A2):
+    __class_private = 0
+    _class_protected = 0
     def __init__(self):
         self.value = "my value B"
-        self.a = 10
-        self.b = [1,2,3]
-        self.comp1 = Compos1()
-        self.comp2 = Compos2()
+        self._a = 10
+        self.__b = [1,2,3]
+        self.__comp1 = Compos1()
+        self._comp2 = Compos2()
+        self._comp2b = Compos2(self._comp2)
 
     def my_abstract_method(self):
         pass
@@ -392,6 +400,8 @@ class C(A1):
     st = 10
     def __init__(self):
         self.value = "my value C"
+        self.__private = 0
+        self._protected = 0
         
     def my_func(self):
         pass

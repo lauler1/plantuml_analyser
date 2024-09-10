@@ -85,17 +85,25 @@ def print_attrs_with_class(class_type):
 
         # Get all instance methods (exclude static methods)
         for name, member in inspect.getmembers(class_type):
-            if not name.startswith('__') and not name in EXCLUDE_LIST:
+            if not name.endswith('__') and not name in EXCLUDE_LIST:
                 # print(f'\' class {name}')
                 key=f'{class_type.__name__}.{name}'
+                
+                vis_name = name # Visibility name
+                prefix = f'_{class_type.__name__}__' # name mangling
+                if name.startswith(prefix):
+                    vis_name = '-' + name.removeprefix(prefix) # de-mangling
+                elif name.startswith('_'):
+                    vis_name = '#' + name.removeprefix('_')
+
                 if inspect.isfunction(member):
                     abs = ""
                     if getattr(member, "__isabstractmethod__", False):
                         abs = " {abstract}"
-                    attr_dict[key] = f' {class_type.__name__} : {{static}}{abs} {name}()'
+                    attr_dict[key] = f' {class_type.__name__} : {{static}}{abs} {vis_name}()'
 
                 else:
-                    attr_dict[key] = f' {class_type.__name__} : {{static}}  {name}: {type(member).__name__}'
+                    attr_dict[key] = f' {class_type.__name__} : {{static}}  {vis_name}: {type(member).__name__}'
     is_interface = True
     for key, attr in attr_dict.items():
         if not "{abstract}" in attr: # If one not abstract
@@ -113,36 +121,52 @@ def print_attrs_with_instance(class_name, class_object):
 
         # Get all instance methods (exclude static methods)
         for name, member in inspect.getmembers(class_object):
-            if not name.startswith('__') and not name in EXCLUDE_LIST:
+            if not name.endswith('__') and not name in EXCLUDE_LIST:
                 key=f'{class_object.__class__.__name__}.{name}'
+
+                vis_name = name # Visibility name
+                prefix = f'_{type(class_object).__name__}__' # name mangling
+                if name.startswith(prefix):
+                    vis_name = '-' + name.removeprefix(prefix) # de-mangling
+                elif name.startswith('_'):
+                    vis_name = '#' + name.removeprefix('_')
+
                 if inspect.ismethod(member):
                     abs = ""
                     if getattr(member, "__isabstractmethod__", False):
                         abs = " {abstract}"
-                    attr_dict[key] = f' {type(class_object).__name__} :{abs} {name}()'
+                    attr_dict[key] = f' {type(class_object).__name__} :{abs} {vis_name}()'
                 elif inspect.isfunction(member):
                     abs = ""
                     if getattr(member, "__isabstractmethod__", False):
                         abs = " {abstract}"
-                    attr_dict[key] = f' {type(class_object).__name__} : {{static}}{abs} {name}()'
+                    attr_dict[key] = f' {type(class_object).__name__} : {{static}}{abs} {vis_name}()'
                 elif not inspect.isroutine(member) and not name in class_object.__dict__:
-                    attr_dict[key] = f' {type(class_object).__name__} : {{static}}  {name}: {type(member).__name__}'
+                    attr_dict[key] = f' {type(class_object).__name__} : {{static}}  {vis_name}: {type(member).__name__}'
                 else:
-                    attr_dict[key] = f' {type(class_object).__name__} : {name}: {type(member).__name__}'
+                    attr_dict[key] = f' {type(class_object).__name__} : {vis_name}: {type(member).__name__}'
     return attr_dict
 
 def get_associated_classes(class_object, association_classes_set):
     # Get all instance methods (exclude static methods)
     for name, member in inspect.getmembers(class_object):
-        if not isinstance(member, (int, float, str, bool, type(None), Container)) and not name.startswith('__') and not name in EXCLUDE_LIST and not inspect.isroutine(member):
+        if not isinstance(member, (int, float, str, bool, type(None), Container)) and not name.endswith('__') and not name in EXCLUDE_LIST and not inspect.isroutine(member):
             association_classes_set.add(type(member))
             get_associated_classes(member, association_classes_set)
         
 def get_associations(class_object, association_classes_set):
 
     for name, member in inspect.getmembers(class_object):
-        if not isinstance(member, (int, float, str, bool, type(None), Container)) and not name.startswith('__') and not name in EXCLUDE_LIST and not inspect.isroutine(member):
-            association_classes_set.add(f'{class_object.__class__.__name__} -right-> {member.__class__.__name__} : {name}')
+        if not isinstance(member, (int, float, str, bool, type(None), Container)) and not name.endswith('__') and not name in EXCLUDE_LIST and not inspect.isroutine(member):
+        
+            vis_name = name # Visibility name
+            prefix = f'_{class_object.__class__.__name__}__' # name mangling
+            if name.startswith(prefix):
+                vis_name = name.removeprefix(prefix) # de-mangling
+            elif name.startswith('_'):
+                vis_name = name.removeprefix('_')
+        
+            association_classes_set.add(f'{class_object.__class__.__name__} -right-> {member.__class__.__name__} : {vis_name}')
             get_associations(member, association_classes_set)
         
         
@@ -152,10 +176,16 @@ def print_object_values(obj_name, object):
     """
     attr_dict = {}
     for name, value in inspect.getmembers(object):
-        if not name.startswith('__') and not name in EXCLUDE_LIST:
+        if not name.endswith('__') and not name in EXCLUDE_LIST:
             key=f'{obj_name}.{name}'
             if not inspect.isroutine(value):
-                attr_dict[key] = f'  {obj_name} : {name} = {value}'
+                vis_name = name # Visibility name
+                prefix = f'_{type(object).__name__}__' # name mangling
+                if name.startswith(prefix):
+                    vis_name = '-' + name.removeprefix(prefix) # de-mangling
+                elif name.startswith('_'):
+                    vis_name = '#' + name.removeprefix('_')
+                attr_dict[key] = f'  {obj_name} : {vis_name} = {value}'
     return attr_dict
 
 def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
@@ -180,7 +210,7 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     notes = []
     note_idx = 1
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__'):
+        if not name.endswith('__'):
             if isinstance(value, pt.PlantumlDataNote):
                 if isinstance(value.ref, type): # Only notes for types
                     notes.append(f'note "{value.note}" as N{note_idx}')
@@ -195,13 +225,13 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     # Get the set of classes associated with the objects, only the classes
     association_classes_set = set()
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__') and not isinstance(value, pt.PlantumlDataNote):
+        if not name.endswith('__') and not isinstance(value, pt.PlantumlDataNote):
             get_associated_classes(value, association_classes_set)
 
     # Get the set of associations
     association_set = set()
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__') and not isinstance(value, pt.PlantumlDataNote):
+        if not name.endswith('__') and not isinstance(value, pt.PlantumlDataNote):
             get_associations(value, association_set)
 
     # Get the dictionary of all class.attributes
@@ -232,7 +262,7 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
         print(inheritance)
 
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__') and not name in EXCLUDE_LIST and not name == "metadata_dict" and not isinstance(value, pt.PlantumlDataNote):
+        if not name.endswith('__') and not name in EXCLUDE_LIST and not name == "metadata_dict" and not isinstance(value, pt.PlantumlDataNote):
             # print (f'\'print_class_attrs_with_instance {name}')
             class_dict.update(print_attrs_with_instance(name, value))
 
@@ -270,7 +300,7 @@ def do_plantuml_object_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     notes = []
     note_idx = 1
     for name, value in inspect.getmembers(plantuml_data):
-        if not name.startswith('__') and not name == "metadata_dict":
+        if not name.endswith('__') and not name == "metadata_dict":
             if isinstance(value, pt.PlantumlDataNote):
                 if not isinstance(value.ref, type): # Only notes for instances
                     notes.append(f'note "{value.note}" as N{note_idx}')

@@ -529,7 +529,6 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
                         if value.has_sub_objs():
                             print_with_indent("</g>", indent)
 
-    connections = {} # Use dictionary to avoid duplications
     # print("\nSize\n-------------------------------------------------------------------------------\n")
     
     orientation = Orientation.LEFT_RIGHT
@@ -601,9 +600,15 @@ def do_svg_architecture(plantuml_arch, layout_style=default_layout_style, **kwar
         for key, value in highway_map["roads"]["rects"].items():
             print_svg_rect(key, value)
 
-    # print all connections only in the end.
-    for value in connections.values():
-        print(value)
+
+    show_connections = True
+    if "show_connections" in plantuml_arch.metadata_dict:
+        show_connections = plantuml_arch.metadata_dict["show_connections"]
+    
+    if show_connections == True:
+        # print all connections only in the end.
+        for value in connections.values():
+            print(value)
 
     print_with_indent("</g>", 2)
 

@@ -485,6 +485,7 @@ class PlantumlArchitecture(PlantumlContainer):
     options:
         arrow_dir: default orientation of the arrows for plantUML, it can be "left to right direction" or "top to bottom direction". For SVG, architecture, svg_orientation has precedence.
         skinparam: plantUML skin parameters, it is a multi-line text.
+        show_connections: Can be used to turn off the visibility of connection in the architecture diagrams (show_connections=False).
     """
 
     @plantuml_architecture_decorator
@@ -584,12 +585,12 @@ skinparam linetype ortho
         if hasattr(self, 'layout_combine_vertical'):
             for item in self.layout_combine_vertical:
                 # Store a tuple
-                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[#red]d-", ObjectRef(item[1])))
+                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[hidden]d-", ObjectRef(item[1])))
                 # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]d- {item[1].path}")
         if hasattr(self, 'layout_combine_horizontal'):
             for item in self.layout_combine_horizontal:
                 # Store a tuple
-                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[#blue]r-", ObjectRef(item[1])))
+                self.metadata_dict["layout_connectors"].append((ObjectRef(item[0]), f"-[hidden]r-", ObjectRef(item[1])))
                 # self.metadata_dict["layout_connectors"].append(f"{item[0].path} -[hidden]r- {item[1].path}")
 
     def get_sub_obj_by_name(self, name):

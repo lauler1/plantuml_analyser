@@ -2,7 +2,7 @@ import copy
 import types
 import asyncio
 # from dataclasses import dataclass, field
-from plantuml.plantuml_activity import do_plantuml_activity
+from plantuml.plantuml_activity import do_plantuml_activity, activity_trace_function
 from plantuml.plantuml_sequence import do_plantuml_sequence
 from plantuml.plantuml_architecture import do_plantuml_architecture, introspect_object
 from plantuml.redirect_output_to_file import redirect_output_to_file
@@ -21,7 +21,7 @@ def example_function(x, a=1, *args, **kwargs):
     z = 2 * y
     # This is a comment before a
     a: Int = 0
-    print1('text1') # Comment print 1
+    print('text1') # Comment print 1
     print('text2')
     
     squares = [x**2 for x in range(10)]
@@ -34,13 +34,13 @@ def example_function(x, a=1, *args, **kwargs):
         y = x + 2
         return x, y
     else: # Comment on else
-        print1('text3')
+        print('text3')
         print('text4')
         y = x - 1
         if z > 20 and z <= 30:
             print(x)
     for i in range(y):
-        print2(i)
+        print(i)
     count = 0
     while count < 5:# Comment on while
         print(f"Count is: {count}")# Comment on print
@@ -53,6 +53,10 @@ def example_function(x, a=1, *args, **kwargs):
         count += 1
         if count >= 5:
             break
+        # else:
+            # pass
+    # else:
+        # pass
     return 10
     
 # Exemplo 2 -------------------------------------------------------------------
@@ -81,17 +85,23 @@ def example_sequence_3(b, c):
 def example_sequence_4():
     return "OK", "Bye"
 
-@redirect_output_to_file('output/log1.puml')
-def case1():
-    # Example with do_plantuml_activity
-    do_plantuml_activity(example_function, filter_call=['func1', 'printd1'], args=True, assign=True, augassign=True, ret=True, comment=True)
+# @redirect_output_to_file('output/log1.puml')
+@redirect_plantuml_output_to_html('output/log1.html', "Activity test", "This is a simple example of activity.")
+def case1(trace_result = []):
 
-@redirect_output_to_file('output/log2.puml')
+    # Example with do_plantuml_activity
+    do_plantuml_activity(example_function, trace_result, filter_call=['func1', 'printd1'], args=True, assign=True, augassign=True, ret=True, comment=True)
+
+# @redirect_output_to_file('output/log2.puml')
+@redirect_plantuml_output_to_html('output/log2.html', "Sequence test", "This is a simple example of sequence.")
 def case2():
     # Example with do_plantuml_sequence
     do_plantuml_sequence((example_sequence_1, "Actor 1", "actor"), (example_sequence_2, "Participant 2", "participant"), (example_sequence_3, "DB 1", "database"), (example_sequence_4, "Last", "participant"), max_rec=10, title="This is a title")
 
 
+# result, trace_result = activity_trace_function(example_function, 100, 0)
+# print(f"result = {result}")
+# print(f"trace_result = {trace_result}")
 case1()
 case2()
 
@@ -230,7 +240,6 @@ It can also be simulated.
         self.component8 = PlantumlComponent()
         self.component9 = PlantumlComponent()
 
-        
         # # Create some invisible plantuml connections to try to fix components in relative positions
         # self.layout_combine_vertical = [(self.component2, self.component6)]
         
@@ -281,6 +290,7 @@ It can also be simulated.
 
 myarch = MySuperArchitecture("my super architecture")
 myarch.set_options(svg_orientation=Orientation.TOP_DOWN) # TOP_DOWN, LEFT_RIGHT
+myarch.set_options(show_connections=True)
 
 # myarch.arch_post_init()
 
@@ -323,6 +333,8 @@ case7(myarch)
 new_arch = clone_architecture(myarch, "Nome da nova classe")
 new_arch.add(PlantumlComponent("Added to the clone"))
 new_arch.frame.sub_architecture.group1.component4.set_options(hide=True)
+new_arch.set_options(show_connections=False)
+
 # # new_arch.get_sub_obj_by_name("Myactor 1")
 # # new_arch.get_sub_obj_by_name("Actor activity")
 # # new_arch.get_sub_obj_by_name("Conn 1")
@@ -450,8 +462,7 @@ cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.co
 # A version of PlantumlConnection used only to align components on the screen: https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
 
 # TODO: Add processes in the architecture diagrams.
-# TODO: Add processes in the architecture diagrams.
 # TODO: Add class diagrams, also include other containes like dictionaries and json.
 # TODO: Hide all connections from architectre
 # TODO: Remove visibility of the hidden connections used for alignment in planuml_achitecture that were made temporary visible.
-
+# Create active diagram with bold path of a execution case using sys.settrace(trace_func) and linecache.getline. Simulate and get the used paths. 

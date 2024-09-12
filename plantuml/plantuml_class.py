@@ -192,6 +192,7 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     """
     This function creates a simple plantuml output representation of the data class diagram.
     This function will only add PlantumlDataNote notes referring to classes, not to instances. 
+    This function will replace the Python visibility prefixes '__' and '_' of the elements names by plantuml visibility simbols ('-' and '#').
     Argumnets:
         plantuml_data -- A class of a PlantumlDataType type.
         kwargs -- Optional key/value arguments.
@@ -282,7 +283,8 @@ def do_plantuml_class_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
 def do_plantuml_object_diagram(plantuml_data: pt.PlantumlDataType, **kwargs):
     """
     This function creates a simple plantuml output representation of the data object diagram.
-    This function will only add PlantumlDataNote notes referring to objects, not to classes. 
+    This function will only add PlantumlDataNote notes referring to objects, not to classes.
+    This function will replace the Python visibility prefixes '__' and '_' of the elements names by plantuml visibility simbols ('-' and '#').
     Argumnets:
         plantuml_data -- A class of a PlantumlDataType type.
         kwargs -- Optional key/value arguments.

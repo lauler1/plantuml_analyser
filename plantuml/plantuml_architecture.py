@@ -181,10 +181,16 @@ def do_plantuml_architecture(plantuml_arch, **kwargs):
     if "skinparam" in plantuml_arch.metadata_dict:
         print(plantuml_arch.metadata_dict["skinparam"])
     recurrent(plantuml_arch, connections, 0)
+
+
+    show_connections = True
+    if "show_connections" in plantuml_arch.metadata_dict:
+        show_connections = plantuml_arch.metadata_dict["show_connections"]
     
-    # print all connections only in the end.
-    for value in connections.values():
-        print(value)
+    if show_connections == True:
+        # print all connections only in the end.
+        for value in connections.values():
+            print(value)
 
     
     print("@enduml")

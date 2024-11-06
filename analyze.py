@@ -84,6 +84,16 @@ def example_sequence_3(b, c):
 
 def example_sequence_4():
     return "OK", "Bye"
+    
+def filter_profile_aor(locative_element):
+    aors = get_aor_per_profile_for_locative_element(locative_element) # Return dictionary {profile: aor}
+    
+    responsibles = {}
+    for profile, aor in aors.items():
+        responsibles.update(get_responsibles_per_profile(profile, aor)) # Return dictionary {profile: [users]}
+        
+    show_alarms(responsibles) # Show the alarms to the users applying the correspondent privilege
+        
 
 # @redirect_output_to_file('output/log1.puml')
 @redirect_plantuml_output_to_html('output/log1.html', "Activity test", "This is a simple example of activity.")
@@ -410,13 +420,16 @@ class B(A1, A2):
 
 class C(A1):
     st = 10
-    def __init__(self):
-        self.value = "my value C"
-        self.__private = 0
-        self._protected = 0
+    def __init__(this):
+        this.value = "my value C"
+        this.__private = 0
+        this._protected = 0
         
     def my_func(self):
         pass
+
+    def set_value(this, new_value):
+        this.value = new_value
 
     @staticmethod
     def my_static_func():
@@ -435,6 +448,7 @@ class ClassDiagram(PlantumlDataType):
         super().__init__()
         self.b = B()
         self.c = C()
+        C.set_value(self.c, "New value 2")
         self.a: int = 0
         self.note1 = PlantumlDataNote(self, self.c, r"This is a note for\nself.c object.")
         self.note2 = PlantumlDataNote(self, type(self.b), "This is a note for type(self.b).")
@@ -461,8 +475,7 @@ cr.test(myarch, [myarch.frame2.component_super_arch1.activity1, myarch.frame2.co
 
 # A version of PlantumlConnection used only to align components on the screen: https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html
 
-# TODO: Add processes in the architecture diagrams.
-# TODO: Add class diagrams, also include other containes like dictionaries and json.
-# TODO: Hide all connections from architectre
-# TODO: Remove visibility of the hidden connections used for alignment in planuml_achitecture that were made temporary visible.
-# Create active diagram with bold path of a execution case using sys.settrace(trace_func) and linecache.getline. Simulate and get the used paths. 
+# TODO: Add processes (from Capella) in the architecture diagrams.
+# TODO: Include to class diagrams: dictionaries and json.
+# How to model 'id' and 'ref' to 'id' in data class diagrams?
+# SVG architecture to accept gradient fill colors
